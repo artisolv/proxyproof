@@ -5,6 +5,16 @@ import { Monogram } from '../Monogram';
 import { useMe } from '../main';
 import { Modal } from '../ui';
 
+const IC3 = 'https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf';
+const AFP = 'https://www.financialprofessionals.org/about/learn-more/press-releases/Details/over-75-percent-of-us-firms-experienced-payments-fraud-in-2025-while-ai-adoption-for-fraud-mitigation-lags';
+// Every figure is quoted from the named source; the average is calculated from two figures in the same report.
+const STATS = [
+  { v: '$3.05B', t: 'lost to business email compromise in 2025, up from $2.77B in 2024.', src: 'FBI IC3 2025 Internet Crime Report', href: IC3 },
+  { v: '76%', t: 'of US organizations faced attempted or actual payments fraud in 2025.', src: 'AFP 2026 Payments Fraud and Control Survey', href: AFP },
+  { v: '$123K', t: 'average loss per business email compromise complaint ($3.05B across 24,768 complaints).', src: 'Calculated from FBI IC3 2025 figures', href: IC3 },
+  { v: '$893M', t: 'lost to scams involving AI, reported to the FBI in 2025.', src: 'FBI IC3 2025 Internet Crime Report', href: IC3 },
+];
+
 const STEPS = [
   ['Request received', 'From a person or an AI agent'],
   ['Evidence checked', 'Registry, history, sender, document'],
@@ -27,21 +37,34 @@ export function Landing() {
     <div className="landing">
       <header className="landing-top"><div className="landing-top-inner">
         <span className="brand"><Monogram size={30} />PayeeProof</span><span style={{ flex: 1 }} />
-        {me.user ? <button className="btn btn-sm btn-primary" onClick={() => nav('/app')}>Open your workspace</button> : <button className="btn btn-sm btn-quiet" onClick={() => setAuth('login')}>Sign in</button>}
+        {me.user ? <button className="btn btn-sm btn-primary" onClick={() => nav('/app')}>My Dashboard</button> : <button className="btn btn-sm btn-quiet" onClick={() => setAuth('login')}>Sign in</button>}
       </div></header>
       <main id="main">
-        <section className="landing-hero">
+        <section className="alarm" aria-labelledby="alarm-h">
+          <h1 id="alarm-h" className="display">Businesses lost $3 billion to fake payment emails last year.</h1>
+          <p className="lead">A changed bank account in an invoice. A “CEO” asking for an urgent wire. Now AI agents that pay whatever they are told. Every number below comes from the FBI or the Association for Financial Professionals.</p>
+          <div className="alarm-grid">
+            {STATS.map((x) => (
+              <div key={x.v} className="alarm-cell">
+                <div className="alarm-v">{x.v}</div>
+                <p>{x.t}</p>
+                <a className="alarm-src" href={x.href} target="_blank" rel="noreferrer">{x.src}</a>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="relief" aria-labelledby="relief-h">
+          <Monogram size={120} animate bg="#e8f5ef" title="PayeeProof monogram" />
           <div>
-            <h1 className="display">No payment moves until it proves itself.</h1>
-            <p className="lead">Before an AI agent or a person can pay, PayeeProof verifies the payee, investigates the request, checks the requester’s authorization and enforces a decision. Held and denied payments cannot reach PayPal.</p>
+            <h2 id="relief-h" className="h1">Don’t worry, you’re protected with PayeeProof.</h2>
+            <p className="lead">The secured AI payment harness you can rely on. Every payment, from a person or an AI agent, is verified, explained and gated before it can reach PayPal.</p>
             <div className="row">
-              <button className="btn btn-primary" onClick={start} disabled={busy}>{busy ? 'Running sample requests through the pipeline…' : 'Open a demo workspace'}</button>
-              <button className="btn btn-secondary" onClick={() => setAuth('signup')}>Create a workspace</button>
+              <button className="btn btn-primary btn-lg" onClick={me.user ? () => nav('/app') : start} disabled={busy}>{busy ? 'Preparing your dashboard…' : 'My Dashboard'}</button>
             </div>
             {error && <div className="notice error" style={{ marginTop: 16 }} role="alert">{error}</div>}
-            <p className="muted small" style={{ marginTop: 14 }}>The demo comes with fictional vendors, an AI agent and ten sample requests, each decided live by the policy engine. Payments use the PayPal sandbox.</p>
+            {!me.user && <p className="muted small" style={{ marginTop: 14 }}>Opens a demo workspace with fictional vendors, an AI agent and ten sample requests, each decided live by the policy engine. Payments use the PayPal sandbox. <button className="linkish" onClick={() => setAuth('signup')}>Create your own workspace</button></p>}
           </div>
-          <div className="hero-mark"><div className="stage"><Monogram size={240} animate bg="#e8f5ef" title="PayeeProof monogram" /></div></div>
         </section>
 
         <section className="questions" aria-label="What every payment must answer">
