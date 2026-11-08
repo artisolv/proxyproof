@@ -258,12 +258,11 @@ dl.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .pp-mark .p1, .pp-mark .p2 { transition: none; }
 .pp-mark.animate .p1 { animation: pp-in-left 0.7s var(--ease) both; }
 .pp-mark.animate .p2 { animation: pp-in-right 0.7s var(--ease) both; }
-.pp-mark.animate .seal { animation: pp-seal 0.5s var(--ease) 0.62s both; transform-origin: 37px 36px; }
-.pp-mark.animate .tick { stroke-dasharray: 14; animation: pp-tick 0.35s ease-out 0.9s both; }
-@keyframes pp-in-left { 0% { transform: translate(-6px, -8px); opacity: 0; } 60% { opacity: 1; } }
-@keyframes pp-in-right { 0% { transform: translate(6px, 8px); opacity: 0; } 60% { opacity: 1; } }
-@keyframes pp-seal { from { transform: scale(0); } }
-@keyframes pp-tick { from { stroke-dashoffset: 14; } to { stroke-dashoffset: 0; } }
+.pp-mark.animate .ov { animation: fade 0.25s ease 0.55s both; }
+.pp-mark.animate .tick { stroke-dasharray: 36; animation: pp-tick 0.45s ease-out 0.75s both; }
+@keyframes pp-in-left { 0% { transform: translate(-7px, 0); opacity: 0; } 60% { opacity: 1; } }
+@keyframes pp-in-right { 0% { transform: translate(7px, 0); opacity: 0; } 60% { opacity: 1; } }
+@keyframes pp-tick { from { stroke-dashoffset: 36; } to { stroke-dashoffset: 0; } }
 .splash { position: fixed; inset: 0; display: grid; place-items: center; background: var(--paper); z-index: 100; }
 .splash-inner { display: grid; justify-items: center; gap: 18px; }
 .splash-word { font-weight: 850; font-size: 22px; letter-spacing: -0.03em; animation: fade 0.3s ease 0.6s both; }
