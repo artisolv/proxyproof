@@ -9,10 +9,22 @@ const IC3 = 'https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf';
 const AFP = 'https://www.financialprofessionals.org/about/learn-more/press-releases/Details/over-75-percent-of-us-firms-experienced-payments-fraud-in-2025-while-ai-adoption-for-fraud-mitigation-lags';
 // Every figure is quoted from the named source; the average is calculated from two figures in the same report.
 const STATS = [
-  { v: '$3.05B', t: 'lost to business email compromise in 2025, up from $2.77B in 2024.', src: 'FBI IC3 2025 Internet Crime Report', href: IC3 },
-  { v: '76%', t: 'of US organizations faced attempted or actual payments fraud in 2025.', src: 'AFP 2026 Payments Fraud and Control Survey', href: AFP },
-  { v: '$123K', t: 'average loss per business email compromise complaint ($3.05B across 24,768 complaints).', src: 'Calculated from FBI IC3 2025 figures', href: IC3 },
-  { v: '$893M', t: 'lost to scams involving AI, reported to the FBI in 2025.', src: 'FBI IC3 2025 Internet Crime Report', href: IC3 },
+  { v: '$3.05B', t: 'lost to business email compromise in 2025, up from $2.77B.', src: 'FBI IC3 2025 report', href: IC3 },
+  { v: '76%', t: 'of US organizations faced attempted or actual payments fraud in 2025.', src: 'AFP 2026 survey', href: AFP },
+  { v: '$123K', t: 'average loss per business email compromise complaint.', src: 'Calculated: $3.05B ÷ 24,768 FBI complaints', href: IC3 },
+  { v: '$893M', t: 'lost to scams involving AI in 2025.', src: 'FBI IC3 2025 report', href: IC3 },
+];
+
+const DECISIONS = [
+  { k: 'allow', name: 'Allowed', means: 'Verified payee, matching bank or PayPal details, within the requester’s authority.', next: 'Can be released to PayPal.', eg: 'A known supplier’s regular invoice.' },
+  { k: 'review', name: 'Under review', means: 'Looks legitimate but needs a person’s sign-off.', next: 'Waits for an approver.', eg: 'An amount above your approval limit.' },
+  { k: 'hold', name: 'Held', means: 'Something important cannot be verified yet.', next: 'Blocked until it is checked independently.', eg: 'An invoice with new payment details.' },
+  { k: 'deny', name: 'Denied', means: 'Breaks one of your rules.', next: 'Cannot be paid.', eg: 'An agent asking for more than its limit.' },
+];
+const AGENT_STEPS: [string, string][] = [
+  ['Signed request', 'Each agent has its own key and a written scope: which vendors, which categories, how much.'],
+  ['Same checks as a person', 'The request is verified against your records and your rules, then gets one of the four answers.'],
+  ['Only the gate pays', 'Agents never see PayPal credentials. Only an allowed payment can pass the gate, and only once.'],
 ];
 
 const STEPS = [
@@ -40,9 +52,8 @@ export function Landing() {
         {me.user ? <button className="btn btn-sm btn-primary" onClick={() => nav('/app')}>My Dashboard</button> : <button className="btn btn-sm btn-quiet" onClick={() => setAuth('login')}>Sign in</button>}
       </div></header>
       <main id="main">
-        <section className="alarm" aria-labelledby="alarm-h">
-          <h1 id="alarm-h" className="display">Businesses lost $3 billion to fake payment emails last year.</h1>
-          <p className="lead">A changed bank account in an invoice. A “CEO” asking for an urgent wire. Now AI agents that pay whatever they are told. Every number below comes from the FBI or the Association for Financial Professionals.</p>
+        <section className="first" aria-labelledby="alarm-h">
+          <h1 id="alarm-h" className="alarm-title">Businesses lost $3 billion to fake payment emails last year.</h1>
           <div className="alarm-grid">
             {STATS.map((x) => (
               <div key={x.v} className="alarm-cell">
@@ -52,25 +63,42 @@ export function Landing() {
               </div>
             ))}
           </div>
-        </section>
-
-        <section className="relief" aria-labelledby="relief-h">
-          <Monogram size={120} animate bg="#e8f5ef" title="PayeeProof monogram" />
-          <div>
-            <h2 id="relief-h" className="h1">Don’t worry, you’re protected with PayeeProof.</h2>
-            <p className="lead">The secured AI payment harness you can rely on. Every payment, from a person or an AI agent, is verified, explained and gated before it can reach PayPal.</p>
-            <div className="row">
-              <button className="btn btn-primary btn-lg" onClick={me.user ? () => nav('/app') : start} disabled={busy}>{busy ? 'Preparing your dashboard…' : 'My Dashboard'}</button>
+          <div className="relief">
+            <Monogram size={64} animate bg="#e8f5ef" title="PayeeProof monogram" />
+            <div>
+              <h2>Don’t worry, you’re protected with PayeeProof.</h2>
+              <p>The secured AI payment harness you can rely on. Every payment, from a person or an AI agent, is verified and gated before it can reach PayPal.</p>
             </div>
-            {error && <div className="notice error" style={{ marginTop: 16 }} role="alert">{error}</div>}
-            {!me.user && <p className="muted small" style={{ marginTop: 14 }}>Opens a demo workspace with fictional vendors, an AI agent and ten sample requests, each decided live by the policy engine. Payments use the PayPal sandbox. <button className="linkish" onClick={() => setAuth('signup')}>Create your own workspace</button></p>}
+            <div className="relief-act">
+              <button className="btn btn-primary btn-lg" onClick={me.user ? () => nav('/app') : start} disabled={busy}>{busy ? 'Preparing…' : 'My Dashboard'}</button>
+              {!me.user && <span className="tiny muted">Demo workspace, PayPal sandbox. <button className="linkish" onClick={() => setAuth('signup')}>Create your own</button></span>}
+            </div>
+            {error && <div className="notice error" style={{ gridColumn: '1 / -1' }} role="alert">{error}</div>}
           </div>
         </section>
 
-        <section className="questions" aria-label="What every payment must answer">
-          {[['Intent', 'What did the business or person actually authorize?'], ['Identity', 'Who is asking, who sent the invoice, and who would receive the money?'], ['Evidence', 'What do your own records and independent sources say?'], ['Enforcement', 'Does deterministic policy permit this exact transaction?']].map(([h, p]) => (
-            <div key={h}><h3>{h}</h3><p className="muted">{p}</p></div>
-          ))}
+        <section className="explain" aria-labelledby="states-h">
+          <h2 id="states-h">Every payment gets one clear answer</h2>
+          <p className="explain-sub">PayeeProof checks who is asking, who would receive the money and whether the details match your records. Then it gives one of four answers, and shows why.</p>
+          <div className="states">
+            {DECISIONS.map((d) => (
+              <div key={d.k} className={`state s-${d.k}`}>
+                <div className="state-name">{d.name}</div>
+                <p>{d.means}</p>
+                <p className="state-next">{d.next}</p>
+                <p className="state-eg">{d.eg}</p>
+              </div>
+            ))}
+          </div>
+          <p className="explain-note">Allowed is not the same as paid. A payment is marked completed only after PayPal confirms it.</p>
+        </section>
+
+        <section className="explain" aria-labelledby="agents-h">
+          <h2 id="agents-h">How AI agents work with PayeeProof</h2>
+          <p className="explain-sub">Agents can ask for a payment. They can never approve or send one themselves.</p>
+          <ol className="agent-steps">
+            {AGENT_STEPS.map(([t, d]) => <li key={t}><strong>{t}</strong><span>{d}</span></li>)}
+          </ol>
         </section>
 
         <section className="gate-demo">
