@@ -1,0 +1,25 @@
+# Render Blueprint. Free plan: the service sleeps when idle and has no persistent disk,
+# so the SQLite database resets on restart. Demo workspaces are created on demand, so judges are unaffected.
+services:
+  - type: web
+    name: payeeproof
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PUBLIC_URL
+        sync: false
+      - key: SERVER_SECRET
+        generateValue: true
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_SANDBOX_RECEIVER_EMAIL
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PORT
+        value: "8787"
