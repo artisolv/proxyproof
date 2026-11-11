@@ -6,3 +6,4 @@ data
 !.env.example
 *.db
 *.db-*
+docs/testing/vitest-results.json

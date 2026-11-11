@@ -13,4 +13,4 @@ if (existsSync('./dist/web/index.html')) {
   app.get('/favicon.svg', serveStatic({ path: './dist/web/favicon.svg' }));
   app.get('*', (c) => (c.req.path.startsWith('/api/') ? c.json({ error: 'Not found.' }, 404) : c.html(readFileSync('./dist/web/index.html', 'utf8'))));
 }
-serve({ fetch: app.fetch, port: config.PORT }, (i) => console.log(`PayeeProof listening on port ${i.port}`));
+serve({ fetch: app.fetch, port: config.PORT }, (i) => console.log(`ProxyProof listening on port ${i.port}`));

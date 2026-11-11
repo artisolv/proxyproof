@@ -1,34 +1,68 @@
-import { Link } from 'react-router-dom';
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, money, when } from './api';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { api } from './api';
 
-export const DECISION_WORD: Record<string, string> = { ALLOW: 'Allowed', REVIEW: 'Needs review', HOLD: 'Held', DENY: 'Denied' };
-export const STATUS_WORD: Record<string, string> = {
-  RECEIVED: 'Received', EXTRACTING: 'Reading files', INVESTIGATING: 'Investigating', EVALUATED: 'Evaluated', READY_FOR_CONFIRMATION: 'Ready to pay', AWAITING_REVIEW: 'Awaiting review',
-  ON_HOLD: 'On hold', DENIED: 'Denied', EXECUTING: 'Sending', PAYMENT_PENDING: 'Payment pending', COMPLETED: 'Paid', FAILED: 'Payment failed', REJECTED: 'Rejected',
-};
-const STATUS_TONE: Record<string, string> = { READY_FOR_CONFIRMATION: 'ALLOW', COMPLETED: 'COMPLETED', AWAITING_REVIEW: 'REVIEW', ON_HOLD: 'HOLD', DENIED: 'DENY', FAILED: 'FAILED', REJECTED: 'DENY', PAYMENT_PENDING: 'PENDING', EXECUTING: 'PENDING' };
-
-export const Chip = ({ tone, children, plain }: { tone?: string; children: ReactNode; plain?: boolean }) => <span className={`chip ${tone ?? ''}${plain ? ' plain' : ''}`}>{children}</span>;
-export const DecisionChip = ({ d }: { d?: string | null }) => d ? <Chip tone={d}>{DECISION_WORD[d] ?? d}</Chip> : <Chip tone="NEUTRAL">No decision</Chip>;
-export const StatusChip = ({ s }: { s: string }) => <Chip tone={STATUS_TONE[s] ?? 'NEUTRAL'}>{STATUS_WORD[s] ?? s}</Chip>;
-
-export function useLoad<T>(path: string | null, deps: unknown[] = []) {
+export function useLoad<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const reload = useCallback(async () => {
     if (!path) return;
-    setLoading(true);
-    try { setData(await api.get<T>(path)); setError(null); } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, ...deps]);
+    try { setData(await api.get<T>(path)); setError(null); } catch (e: any) { setError(e.message); }
+  }, [path]);
   useEffect(() => { reload(); }, [reload]);
-  return { data, error, loading, reload, setData };
+  return { data, error, reload };
 }
 
-export const Loading = ({ lines = 3 }: { lines?: number }) => <div className="stack-sm" aria-busy="true" aria-label="Loading">{Array.from({ length: lines }, (_, i) => <div key={i} className="skeleton" style={{ width: `${90 - i * 14}%`, height: i === 0 ? 34 : 18 }} />)}</div>;
-export const ErrorNote = ({ error, retry }: { error: string; retry?: () => void }) => <div className="notice error row" role="alert"><span style={{ flex: 1 }}>{error}</span>{retry && <button className="btn btn-sm btn-secondary" onClick={retry}>Try again</button>}</div>;
+export const usePrefersReducedMotion = () => {
+  const [reduce, setReduce] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const m = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const on = () => setReduce(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return reduce;
+};
+
+export type Action = 'MAKE' | 'COLLECT';
+export const PERSPECTIVE: Record<Action, { label: string; text: string }> = {
+  MAKE: { label: 'Seller perspective', text: 'A seller receives a purchase from a buyer’s AI agent. Is that agent really authorized by the buyer to make this purchase, at this amount, from this seller?' },
+  COLLECT: { label: 'Buyer perspective', text: 'A buyer receives a quote or invoice from a seller’s AI agent. Is that agent really authorized by the business to issue it, and to be paid at that account?' },
+};
+
+/**
+ * "Is this AI agent authorized to [MAKE / COLLECT] payment?" Only the action word moves, inside a fixed slot.
+ * Screen readers get the whole question once. With reduced motion, both words are shown and nothing animates.
+ */
+export function Question({ action, as: Tag = 'h1', className = '' }: { action: Action; as?: 'h1' | 'h2'; className?: string }) {
+  const reduce = usePrefersReducedMotion();
+  const [state, setState] = useState<{ current: Action; prev: Action | null; n: number }>({ current: action, prev: null, n: 0 });
+  const refs = { MAKE: useRef<HTMLSpanElement>(null), COLLECT: useRef<HTMLSpanElement>(null) };
+  const [width, setWidth] = useState<number | null>(null);
+  useEffect(() => { if (action !== state.current) setState((s) => ({ current: action, prev: s.current, n: s.n + 1 })); }, [action]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The slot takes the width of the word it shows and eases between widths, so "payment?" never jumps or gaps.
+  useLayoutEffect(() => {
+    const measure = () => setWidth(refs[state.current].current?.offsetWidth ?? null);
+    measure();
+    window.addEventListener('resize', measure);
+    document.fonts?.ready.then(measure).catch(() => {});
+    return () => window.removeEventListener('resize', measure);
+  }, [state.current]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Tag className={`q ${className}`}>
+      <span className="sr-only">Is this AI agent authorized to make or collect payment?</span>
+      <span aria-hidden="true">
+        Is this AI agent authorized to{' '}
+        {reduce ? <span className="word-static">make or collect</span> : (
+          <span className="slot" style={width ? { width } : undefined}>
+            <span className="measure"><span ref={refs.MAKE}>MAKE</span><span ref={refs.COLLECT}>COLLECT</span></span>
+            {state.prev && <span key={`out-${state.n}`} className="w out">{state.prev}</span>}
+            <span key={`in-${state.n}`} className={`w in${state.n === 0 ? ' first' : ''}`}>{state.current}</span>
+          </span>
+        )}{' '}payment?
+      </span>
+    </Tag>
+  );
+}
 
 export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -40,97 +74,19 @@ export function Modal({ title, children, onClose }: { title: string; children: R
     return () => { window.removeEventListener('keydown', onKey); prev?.focus(); };
   }, [onClose]);
   return (
-    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={ref}>
-        <h2 className="h3">{title}</h2>
+        <div className="row" style={{ justifyContent: 'space-between' }}><h2>{title}</h2><button className="btn btn-quiet btn-sm" onClick={onClose} aria-label="Close">Close</button></div>
         {children}
       </div>
     </div>
   );
 }
 
-const ToastCtx = createContext<(m: string) => void>(() => {});
-export function ToastHost({ children }: { children: ReactNode }) {
-  const [msg, setMsg] = useState<string | null>(null);
-  const timer = useRef<number>(0);
-  const show = useCallback((m: string) => { setMsg(m); window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setMsg(null), 3200); }, []);
-  return <ToastCtx.Provider value={show}>{children}{msg && <div className="toast" role="status">{msg}</div>}</ToastCtx.Provider>;
-}
-export const useToast = () => useContext(ToastCtx);
-
-export function Dropzone({ files, setFiles, accept = '.pdf,.png,.jpg,.jpeg,.eml,application/pdf,image/png,image/jpeg,message/rfc822' }: { files: File[]; setFiles: (f: File[]) => void; accept?: string }) {
-  const [over, setOver] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
-  const add = (list: FileList | null) => list && setFiles([...files, ...Array.from(list)].slice(0, 5));
-  return (
-    <div>
-      <div className={`drop${over ? ' over' : ''}`} role="button" tabIndex={0} onClick={() => input.current?.click()} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && input.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={(e) => { e.preventDefault(); setOver(false); add(e.dataTransfer.files); }}>
-        <strong>Drop an invoice or email here</strong>
-        <span className="muted small">PDF, PNG, JPG or .eml, up to 10 MB each. Add the email and the invoice together if you have both.</span>
-        <input ref={input} type="file" multiple accept={accept} className="sr-only" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
-      </div>
-      {files.length > 0 && <div className="files">{files.map((f, i) => (
-        <div className="file" key={i}><span style={{ overflowWrap: 'anywhere' }}>{f.name} <span className="muted tiny">{(f.size / 1024).toFixed(0)} KB</span></span>
-          <button className="btn btn-sm btn-quiet" onClick={() => setFiles(files.filter((_, j) => j !== i))} aria-label={`Remove ${f.name}`}>Remove</button></div>))}</div>}
-    </div>
-  );
-}
-
-/** Transaction states as people should read them. ALLOWED is a policy permission; COMPLETED means PayPal confirmed it. */
-export const OUTCOME: Record<string, { label: string; color: string; help: string }> = {
-  ALLOWED: { label: 'Allowed', color: 'var(--allow)', help: 'Policy permits it. Not paid until someone releases it.' },
-  UNDER_REVIEW: { label: 'Under review', color: 'var(--review)', help: 'A person’s decision or more evidence is needed.' },
-  HELD: { label: 'Held', color: '#e08a00', help: 'Cannot proceed until a verification is resolved.' },
-  DENIED: { label: 'Denied', color: 'var(--deny)', help: 'Breaks a security rule or authorization boundary.' },
-  PROCESSING: { label: 'Processing', color: 'var(--proc)', help: 'Released. Waiting for PayPal to confirm.' },
-  COMPLETED: { label: 'Completed', color: 'var(--done)', help: 'PayPal confirmed the payment.' },
-  FAILED: { label: 'Payment failed', color: 'var(--deny)', help: 'PayPal did not complete it.' },
-  NOT_EVALUATED: { label: 'Not evaluated', color: 'var(--proc)', help: '' },
+const STATE_WORD: Record<string, string> = {
+  AUTHORIZED: 'Authorized', CONNECTED: 'Connected, not authorized', PENDING_APPROVAL: 'Awaiting approval', EXPIRED: 'Expired', REVOKED: 'Revoked',
+  ALLOW: 'Allow', HOLD: 'Hold', REVIEW: 'Review', DENY: 'Deny', VERIFIED: 'Enrolled', UNVERIFIED: 'Not enrolled',
+  NOT_STARTED: 'No payment yet', AWAITING_BUYER_APPROVAL: 'Awaiting buyer on PayPal', CAPTURE_SUBMITTED: 'Capture submitted', COMPLETED: 'Paid (PayPal confirmed)', FAILED: 'Payment failed', CANCELLED: 'Cancelled',
+  pass: 'Pass', hold: 'Hold', review: 'Review', fail: 'Fail', not_reached: 'Not reached',
 };
-export const OutcomeChip = ({ o }: { o: string }) => <span className={`chip o-${o}`} title={OUTCOME[o]?.help}>{OUTCOME[o]?.label ?? o}</span>;
-
-export const AgentIcon = () => <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="4.5" width="11" height="8.5" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M8 2v2.5M6 8.5h.01M10 8.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
-export const PersonIcon = () => <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.7" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M2.8 14c.6-2.6 2.7-4 5.2-4s4.6 1.4 5.2 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
-
-export type ActivityRow = {
-  id: string; reference: string | null; payee: string; amount_minor: number | null; currency: string | null; initiator: { kind: 'AGENT' | 'HUMAN'; name: string };
-  outcome: string; reason: string; moreReasons: number; indicators: { key: string; label: string }[]; nextAction: string | null; created_at: string; sample: boolean; providerRef: string | null;
-};
-
-export function Activity({ rows, empty }: { rows: ActivityRow[]; empty?: ReactNode }) {
-  if (!rows.length) return <div className="acts"><div className="empty">{empty ?? <p>No transactions match.</p>}</div></div>;
-  return (
-    <div className="acts" role="list">
-      {rows.map((r) => (
-        <Link key={r.id} to={`/app/transactions/${r.id}`} className="act" role="listitem">
-          <span className={`rail o-${r.outcome}`} aria-hidden="true" />
-          <div className="main">
-            <div className="top"><span className="payee">{r.payee}</span><span className="ref">{r.reference ?? 'No invoice reference'}</span></div>
-            <div className="why">{r.reason}{r.moreReasons > 0 && <span className="more"> +{r.moreReasons} more</span>}</div>
-            <div className="meta">
-              <span className="who-ic">{r.initiator.kind === 'AGENT' ? <AgentIcon /> : <PersonIcon />}{r.initiator.name}</span>
-              <span>{when(r.created_at)}</span>
-              {r.indicators.map((i) => <span key={i.key} className="tag">{i.label}</span>)}
-              {r.sample && <span className="tag sample" title="Created with the demo workspace and decided live by the policy engine">Sample</span>}
-              {r.nextAction && <span className="next">Next: {r.nextAction}</span>}
-            </div>
-          </div>
-          <div className="side-col"><span className="amt">{money(r.amount_minor, r.currency ?? 'USD')}</span><OutcomeChip o={r.outcome} /></div>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-const CK_ICON: Record<string, ReactNode> = {
-  pass: <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-  fail: <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>,
-  warn: <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2.5v4.2M6 9.2h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" /></svg>,
-  na: <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 6h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>,
-};
-const CK_WORD: Record<string, string> = { pass: 'Verified', fail: 'Did not match', warn: 'Warning', na: 'Not applicable' };
-export function Checklist({ checks }: { checks: { key: string; label: string; state: string; detail: string }[] }) {
-  if (!checks?.length) return <p className="muted small">No checks were recorded for this request.</p>;
-  return <div className="checks">{checks.map((c) => <div key={c.key} className={`ck ${c.state}`}><span className="ic" role="img" aria-label={CK_WORD[c.state]}>{CK_ICON[c.state]}</span><span className="lb">{c.label}</span><span className="dt">{c.detail}</span></div>)}</div>;
-}
+export const Chip = ({ v }: { v: string }) => <span className={`chip ${v}`}>{STATE_WORD[v] ?? v}</span>;

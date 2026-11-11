@@ -12,7 +12,6 @@ export function openDb(path: string): DB {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(readFileSync(join(here, 'schema.sql'), 'utf8'));
-  migrate(db);
   return db;
 }
 
@@ -40,17 +39,4 @@ export function serverSecret(db: DB, name: string, configured?: string): string 
   const value = randomBytes(32).toString('base64url');
   run(db, 'INSERT INTO server_secrets (name, value) VALUES (?, ?)', name, value);
   return value;
-}
-
-/** Additive migrations for databases created by earlier versions. Each step is idempotent. */
-const MIGRATIONS: { table: string; column: string; ddl: string }[] = [
-  { table: 'approvals', column: 'reviewed_codes', ddl: "ALTER TABLE approvals ADD COLUMN reviewed_codes TEXT NOT NULL DEFAULT '[]'" },
-  { table: 'payment_attempts', column: 'invoice_id', ddl: 'ALTER TABLE payment_attempts ADD COLUMN invoice_id TEXT' },
-  { table: 'payment_attempts', column: 'agent_id', ddl: 'ALTER TABLE payment_attempts ADD COLUMN agent_id TEXT' },
-];
-function migrate(db: DB) {
-  for (const m of MIGRATIONS) {
-    const cols = (db.prepare(`PRAGMA table_info(${m.table})`).all() as { name: string }[]).map((c) => c.name);
-    if (!cols.includes(m.column)) db.exec(m.ddl);
-  }
 }

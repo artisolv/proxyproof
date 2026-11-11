@@ -1,6 +1,6 @@
 /**
- * The only module that reads PayPal credentials. It is imported only by executor/. Nothing in ai/, ingest/, evidence/,
- * or agents/ can reach it; test/architecture.test.ts enforces that. It talks to the sandbox or a loopback mock, never live.
+ * The only module that reads PayPal credentials. It is imported only by executor/. Nothing in trust/ or runtime/
+ * can reach it; a test enforces that. It talks to the PayPal sandbox or a loopback mock, never live.
  */
 import type { Config } from '../config.js';
 import { minorToDecimal } from '../core/util.js';
@@ -13,7 +13,7 @@ export type PayPal = ReturnType<typeof createPayPal>;
 
 // Issued only by the gate. A pass cannot be constructed elsewhere, so a rail call without one fails.
 const issued = new WeakSet<object>();
-export type GatePass = { readonly attemptId: string; readonly requestId: string };
+export type GatePass = { readonly attemptId: string; readonly transactionId: string };
 export function __issuePass(p: GatePass): GatePass { const o = Object.freeze({ ...p }); issued.add(o); return o; }
 const assertPass = (p: GatePass) => { if (!p || typeof p !== 'object' || !issued.has(p)) throw new Error('Rail call refused: no gate pass.'); };
 
@@ -37,8 +37,9 @@ export function createPayPal(config: Config) {
     return cached.token;
   }
 
-  async function call(path: string, opts: { method?: string; json?: unknown; requestId?: string; rawBody?: string } = {}): Promise<any> {
+  async function call(path: string, opts: { method?: string; json?: unknown; requestId?: string; rawBody?: string; prefer?: string } = {}): Promise<any> {
     const headers: Record<string, string> = { Authorization: `Bearer ${await token()}`, Accept: 'application/json' };
+    if (opts.prefer) headers.Prefer = opts.prefer;
     if (opts.json || opts.rawBody) headers['Content-Type'] = 'application/json';
     if (opts.requestId) headers['PayPal-Request-Id'] = opts.requestId;
     let res: Response;
@@ -50,7 +51,8 @@ export function createPayPal(config: Config) {
     try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
     if (!res.ok) {
       const kind = res.status >= 500 || res.status === 429 ? 'AMBIGUOUS' : 'DEFINITE';
-      throw new ProviderError(`PayPal returned ${data.name ?? `HTTP ${res.status}`}${data.message ? `: ${data.message}` : ''}`, kind, res.status, data.name);
+      const issue = Array.isArray(data.details) && data.details[0] ? ` (${[data.details[0].issue, data.details[0].field].filter(Boolean).join(' at ')})` : '';
+      throw new ProviderError(`PayPal returned ${data.name ?? `HTTP ${res.status}`}${data.message ? `: ${data.message}` : ''}${issue}`, kind, res.status, data.name);
     }
     return data;
   }
@@ -59,30 +61,14 @@ export function createPayPal(config: Config) {
     configured, base, webhookConfigured: Boolean(config.PAYPAL_WEBHOOK_ID),
     async health() { await token(); return true; },
 
-    async createPayout(pass: GatePass, p: { idempotencyKey: string; receiverEmail: string; amountMinor: number; currency: string; note: string }) {
-      assertPass(pass);
-      const data = await call('/v1/payments/payouts', {
-        method: 'POST', requestId: p.idempotencyKey,
-        json: {
-          sender_batch_header: { sender_batch_id: p.idempotencyKey, email_subject: 'Sandbox payment', email_message: 'Sandbox test payment released by PayeeProof.' },
-          items: [{ recipient_type: 'EMAIL', amount: { value: minorToDecimal(p.amountMinor), currency: p.currency }, receiver: p.receiverEmail, note: p.note.slice(0, 200), sender_item_id: p.idempotencyKey }],
-        },
-      });
-      return { batchId: data.batch_header?.payout_batch_id as string, batchStatus: data.batch_header?.batch_status as string };
-    },
-    async getPayoutBatch(batchId: string) {
-      const data = await call(`/v1/payments/payouts/${encodeURIComponent(batchId)}`);
-      const item = data.items?.[0];
-      return { batchStatus: data.batch_header?.batch_status as string, itemStatus: item?.transaction_status as string | undefined, itemId: item?.payout_item_id as string | undefined, error: item?.errors?.message as string | undefined };
-    },
-
-    async createOrder(pass: GatePass, p: { idempotencyKey: string; payeeEmail: string; amountMinor: number; currency: string; invoiceId?: string; returnUrl: string; cancelUrl: string }) {
+    /** Checkout for a bilateral transaction ProxyProof allowed. The buyer approves on PayPal; no agent can. */
+    async createOrder(pass: GatePass, p: { idempotencyKey: string; amountMinor: number; currency: string; reference: string; description: string; returnUrl: string; cancelUrl: string }) {
       assertPass(pass);
       const data = await call('/v2/checkout/orders', {
         method: 'POST', requestId: p.idempotencyKey,
         json: {
           intent: 'CAPTURE',
-          purchase_units: [{ reference_id: pass.requestId, custom_id: pass.attemptId, invoice_id: p.invoiceId?.slice(0, 127), amount: { currency_code: p.currency, value: minorToDecimal(p.amountMinor) }, payee: { email_address: p.payeeEmail } }],
+          purchase_units: [{ reference_id: pass.transactionId, custom_id: pass.attemptId, invoice_id: p.reference.slice(0, 127), description: p.description.slice(0, 127), amount: { currency_code: p.currency, value: minorToDecimal(p.amountMinor) } }],
           payment_source: { paypal: { experience_context: { user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING', return_url: p.returnUrl, cancel_url: p.cancelUrl } } },
         },
       });

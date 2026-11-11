@@ -1,7 +1,7 @@
 export class ApiError extends Error { constructor(message: string, public status: number, public code?: string) { super(message); } }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const init: RequestInit = { method, credentials: 'same-origin', headers: { 'x-payeeproof': '1' } };
+  const init: RequestInit = { method, credentials: 'same-origin', headers: { 'x-proxyproof': '1' } };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); (init.headers as any)['content-type'] = 'application/json'; }
   const res = await fetch(path, init);

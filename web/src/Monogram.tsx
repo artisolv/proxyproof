@@ -1,5 +1,5 @@
 /**
- * PayeeProof's own monogram: a dark green P and a light green mirrored P standing back to back, their
+ * ProxyProof's own monogram: a dark green P and a light green mirrored P standing back to back, their
  * stems side by side in the middle and their bowls facing outward. A white check mark sits centred in the
  * top half of the light green P. Two sides of a payment, meeting at the proof.
  * Built from its own geometry; upright, mirrored and green so it cannot be mistaken for any payment
@@ -13,7 +13,7 @@
 const P = 'M32 8H41A11 11 0 0 1 41 30H38V45a3 3 0 0 1-3 3H32a3 3 0 0 1-3-3V11a3 3 0 0 1 3-3Z';
 const CHECK = 'M34.5 19.5L38.5 23.5L46.5 14.5';
 
-export function Monogram({ size = 32, animate = false, seal = true, title = 'PayeeProof' }: { size?: number; animate?: boolean; bg?: string; seal?: boolean; title?: string }) {
+export function Monogram({ size = 32, animate = false, seal = true, title = 'ProxyProof' }: { size?: number; animate?: boolean; bg?: string; seal?: boolean; title?: string }) {
   return (
     <svg className={`pp-mark${animate ? ' animate' : ''}`} width={size} height={size} viewBox="0 0 56 56" role="img" aria-label={title}>
       <g className="p1"><path d={P} fill="#064e37" transform="matrix(-1 0 0 1 56 0)" /></g>

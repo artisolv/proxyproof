@@ -1,5 +1,5 @@
 {
-  "name": "payeeproof",
+  "name": "proxyproof",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,8 +10,7 @@
     "build": "vite build",
     "start": "node --env-file-if-exists=.env --import tsx server/src/index.ts",
     "typecheck": "tsc --noEmit",
-    "fixtures": "tsx scripts/write-fixtures.ts",
-    "sandbox:check": "node --env-file=.env --import tsx scripts/live-sandbox-check.ts"
+    "test:report": "vitest run --reporter=json --outputFile=docs/testing/vitest-results.json; tsx scripts/test-report.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,23 +18,18 @@
   "type": "module",
   "private": "true",
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.6.0",
     "@hono/node-server": "^2.1.6",
-    "@tesseract.js-data/eng": "^1.0.0",
+    "@modelcontextprotocol/hono": "^2.0.2",
+    "@modelcontextprotocol/server": "^2.4.0",
     "hono": "^4.13.17",
     "jose": "^6.2.15",
-    "mailparser": "^3.14.2",
-    "pdfjs-dist": "^6.5.438",
-    "pdfkit": "^0.20.2",
-    "tesseract.js": "^7.0.0",
     "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
-    "@types/mailparser": "^3.9.0",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^26.6.6",
-    "@types/pdfkit": "^0.17.7",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",

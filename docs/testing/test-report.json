@@ -1,0 +1,232 @@
+{
+  "generated_at": "2026-11-08T12:26:50.520Z",
+  "environment": "Node v24.21.0, darwin arm64, Apple M4, in-memory SQLite, PayPal mocked on loopback",
+  "total": 30,
+  "passed": 30,
+  "failed": 0,
+  "properties": [
+    {
+      "name": "Valid bilateral transaction allowed",
+      "tests": 4,
+      "failed": 0
+    },
+    {
+      "name": "Seller authority failures rejected",
+      "tests": 5,
+      "failed": 0
+    },
+    {
+      "name": "Buyer scope and authority failures rejected",
+      "tests": 4,
+      "failed": 0
+    },
+    {
+      "name": "Invalid signatures, forged or self-issued authority",
+      "tests": 3,
+      "failed": 0
+    },
+    {
+      "name": "Transaction mutation and term changes",
+      "tests": 3,
+      "failed": 0
+    },
+    {
+      "name": "Replay and duplicate execution",
+      "tests": 3,
+      "failed": 0
+    },
+    {
+      "name": "Revocation and expiry enforced, including at time of use",
+      "tests": 4,
+      "failed": 0
+    },
+    {
+      "name": "Fail closed when a dependency is unavailable",
+      "tests": 1,
+      "failed": 0
+    },
+    {
+      "name": "Direct executor bypass attempts",
+      "tests": 2,
+      "failed": 0
+    },
+    {
+      "name": "Payment completion only on provider confirmation",
+      "tests": 2,
+      "failed": 0
+    },
+    {
+      "name": "Evidence bundle integrity",
+      "tests": 1,
+      "failed": 0
+    },
+    {
+      "name": "MCP connector authentication and scope",
+      "tests": 5,
+      "failed": 0
+    },
+    {
+      "name": "Architecture boundaries",
+      "tests": 2,
+      "failed": 0
+    }
+  ],
+  "tests": [
+    {
+      "name": "bilateral verification › 1. both sides valid: ALLOW with both authority chains and the match recorded, and a single-use permit",
+      "status": "passed",
+      "ms": 57
+    },
+    {
+      "name": "bilateral verification › 2. seller agent not authorized to invoice: DENY, never presented as a verified seller request",
+      "status": "passed",
+      "ms": 26
+    },
+    {
+      "name": "bilateral verification › 3. buyer over its limit: DENY; between the approval threshold and the limit: REVIEW, then ALLOW after approval",
+      "status": "passed",
+      "ms": 28
+    },
+    {
+      "name": "bilateral verification › 4. same owner, different agent: the research agent fails on authority, the procurement agent passes",
+      "status": "passed",
+      "ms": 26
+    },
+    {
+      "name": "bilateral verification › 5. terms changed after approval: the earlier authorization and permit no longer apply",
+      "status": "passed",
+      "ms": 26
+    },
+    {
+      "name": "bilateral verification › 5b. a buyer agent that authorizes different terms from those on the table is refused",
+      "status": "passed",
+      "ms": 14
+    },
+    {
+      "name": "bilateral verification › 6. wrong payment destination: DENY before any payment",
+      "status": "passed",
+      "ms": 10
+    },
+    {
+      "name": "bilateral verification › 7. expired and revoked authority, on both sides",
+      "status": "passed",
+      "ms": 32
+    },
+    {
+      "name": "bilateral verification › 8. invalid seller signature, forged or self-issued authority, unknown keys and missing proof are rejected",
+      "status": "passed",
+      "ms": 49
+    },
+    {
+      "name": "bilateral verification › 9. replayed requests are refused on both sides",
+      "status": "passed",
+      "ms": 17
+    },
+    {
+      "name": "bilateral verification › unverified organizations are held, not trusted and not denied",
+      "status": "passed",
+      "ms": 9
+    },
+    {
+      "name": "bilateral verification › 11. verification dependency unavailable: HOLD, then recovery after it returns",
+      "status": "passed",
+      "ms": 15
+    },
+    {
+      "name": "bilateral verification › expired terms cannot be accepted",
+      "status": "passed",
+      "ms": 11
+    },
+    {
+      "name": "bilateral verification › the path stops at the first failed check on each side",
+      "status": "passed",
+      "ms": 10
+    },
+    {
+      "name": "protected execution boundary › a valid permit opens a PayPal checkout; COMPLETED only after PayPal confirms the capture",
+      "status": "passed",
+      "ms": 67
+    },
+    {
+      "name": "protected execution boundary › 12. bypass: no permit, a forged permit, or a permit for another transaction is refused, and PayPal is never called",
+      "status": "passed",
+      "ms": 41
+    },
+    {
+      "name": "protected execution boundary › 9. a permit is single use: a second execution is refused and recorded",
+      "status": "passed",
+      "ms": 23
+    },
+    {
+      "name": "protected execution boundary › concurrent executions with two valid permits create one checkout",
+      "status": "passed",
+      "ms": 19
+    },
+    {
+      "name": "protected execution boundary › time of use: revoking the seller agent after approval stops execution at the boundary",
+      "status": "passed",
+      "ms": 19
+    },
+    {
+      "name": "protected execution boundary › revoking after checkout opened prevents capture",
+      "status": "passed",
+      "ms": 22
+    },
+    {
+      "name": "protected execution boundary › unverified webhooks change nothing",
+      "status": "passed",
+      "ms": 18
+    },
+    {
+      "name": "protected execution boundary › the evidence bundle links both chains, verifies, and detects tampering",
+      "status": "passed",
+      "ms": 21
+    },
+    {
+      "name": "architecture › only the executor and app wiring can reach the PayPal client",
+      "status": "passed",
+      "ms": 1
+    },
+    {
+      "name": "architecture › the MCP connector cannot reach the PayPal client or private key tables directly",
+      "status": "passed",
+      "ms": 0
+    },
+    {
+      "name": "an independently developed agent on the REST API › registers with its own key, waits for its organization, accepts a verified invoice and checks the receipt",
+      "status": "passed",
+      "ms": 59
+    },
+    {
+      "name": "an independently developed agent on the REST API › rejects a registration carrying a private key",
+      "status": "passed",
+      "ms": 8
+    },
+    {
+      "name": "ProxyProof MCP connector › refuses a connection without a valid ProxyProof connection token",
+      "status": "passed",
+      "ms": 34
+    },
+    {
+      "name": "ProxyProof MCP connector › refuses requests from a foreign browser origin",
+      "status": "passed",
+      "ms": 8
+    },
+    {
+      "name": "ProxyProof MCP connector › connected is not authorized; the organization approves; then two MCP agents complete one bilateral transaction",
+      "status": "passed",
+      "ms": 95
+    },
+    {
+      "name": "ProxyProof MCP connector › a seller agent cannot use buyer tools and vice versa",
+      "status": "passed",
+      "ms": 9
+    }
+  ],
+  "latency": {
+    "samples": 40,
+    "what": "seller offer + buyer acceptance via the public API, including signing, both-side verification and matching",
+    "p50_ms": 2.9,
+    "p95_ms": 4.6
+  }
+}

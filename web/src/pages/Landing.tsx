@@ -1,154 +1,161 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { Monogram } from '../Monogram';
 import { useMe } from '../main';
-import { Modal } from '../ui';
+import { PERSPECTIVE, Question, usePrefersReducedMotion, type Action } from '../ui';
 
-const IC3 = 'https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf';
-const AFP = 'https://www.financialprofessionals.org/about/learn-more/press-releases/Details/over-75-percent-of-us-firms-experienced-payments-fraud-in-2025-while-ai-adoption-for-fraud-mitigation-lags';
-// Every figure is quoted from the named source; the average is calculated from two figures in the same report.
-const STATS = [
-  { v: '$3.05B', t: 'lost to business email compromise in 2025, up from $2.77B.', src: 'FBI IC3 2025 report', href: IC3 },
-  { v: '76%', t: 'of US organizations faced attempted or actual payments fraud in 2025.', src: 'AFP 2026 survey', href: AFP },
-  { v: '$123K', t: 'average loss per business email compromise complaint.', src: 'Calculated: $3.05B ÷ 24,768 FBI complaints', href: IC3 },
-  { v: '$893M', t: 'lost to scams involving AI in 2025.', src: 'FBI IC3 2025 report', href: IC3 },
+/** One loop of the illustration. Which side is checked first follows the question being asked. */
+const CYCLE: { action: Action; pass: boolean; stopAt: 'buyer' | 'seller' | null; reason: string }[] = [
+  { action: 'MAKE', pass: true, stopAt: null, reason: 'Both authorities verified, same terms signed. Checkout opens.' },
+  { action: 'COLLECT', pass: false, stopAt: 'seller', reason: 'Stopped: the seller’s agent may quote, but not invoice.' },
+  { action: 'MAKE', pass: false, stopAt: 'buyer', reason: 'Stopped: the buyer revoked its agent’s authority.' },
+  { action: 'COLLECT', pass: true, stopAt: null, reason: 'Both authorities verified, same terms signed. Checkout opens.' },
 ];
+const STEP_MS = 5000;
 
-const DECISIONS = [
-  { k: 'allow', name: 'Allowed', means: 'Verified payee, matching bank or PayPal details, within the requester’s authority.', next: 'Can be released to PayPal.', eg: 'A known supplier’s regular invoice.' },
-  { k: 'review', name: 'Under review', means: 'Looks legitimate but needs a person’s sign-off.', next: 'Waits for an approver.', eg: 'An amount above your approval limit.' },
-  { k: 'hold', name: 'Held', means: 'Something important cannot be verified yet.', next: 'Blocked until it is checked independently.', eg: 'An invoice with new payment details.' },
-  { k: 'deny', name: 'Denied', means: 'Breaks one of your rules.', next: 'Cannot be paid.', eg: 'An agent asking for more than its limit.' },
-];
-const AGENT_STEPS: [string, string][] = [
-  ['Signed request', 'Each agent has its own key and a written scope: which vendors, which categories, how much.'],
-  ['Same checks as a person', 'The request is verified against your records and your rules, then gets one of the four answers.'],
-  ['Only the gate pays', 'Agents never see PayPal credentials. Only an allowed payment can pass the gate, and only once.'],
-];
-
-const STEPS = [
-  ['Request received', 'From a person or an AI agent'],
-  ['Evidence checked', 'Registry, history, sender, document'],
-  ['Policy decides', 'Deterministic rules, no model vote'],
-  ['Gate', 'Re-checks live state, claims once'],
-  ['PayPal sandbox', 'Provider confirms the result'],
-];
-
-export function Landing() {
-  const nav = useNavigate();
-  const { refresh, me } = useMe();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [auth, setAuth] = useState<'login' | 'signup' | null>(null);
-  const start = async () => {
-    setBusy(true); setError(null);
-    try { await api.post('/api/demo/start'); await refresh(); nav('/app'); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+function BilateralViz({ step, phase }: { step: number; phase: number }) {
+  const c = CYCLE[step];
+  // MAKE: the seller asks about the buyer's agent first. COLLECT: the buyer asks about the seller's agent first.
+  const order: ('buyer' | 'seller' | 'terms')[] = c.action === 'MAKE' ? ['buyer', 'seller', 'terms'] : ['seller', 'buyer', 'terms'];
+  const lit = Math.max(0, Math.min(3, phase - 1));
+  const stopIdx = c.stopAt ? order.indexOf(c.stopAt) : -1;
+  const state = (k: 'buyer' | 'seller' | 'terms') => {
+    const i = order.indexOf(k);
+    if (i >= lit) return 'idle';
+    if (stopIdx >= 0 && i === stopIdx) return 'fail';
+    if (stopIdx >= 0 && i > stopIdx) return 'idle';
+    return 'pass';
   };
+  const done = phase >= 5;
+  const open = done && c.pass;
+  const col = (s: string) => (s === 'pass' ? 'var(--green-line)' : s === 'fail' ? 'var(--red)' : 'var(--line)');
+  const box = (x: number, y: number, w: number, h: number, t1: string, t2: string, hi?: string) => (
+    <g className="fv-node"><rect x={x} y={y} width={w} height={h} rx="12" style={hi ? { stroke: hi, strokeWidth: 2 } : undefined} /><text x={x + w / 2} y={y + h / 2 - 3} textAnchor="middle">{t1}</text><text className="sub" x={x + w / 2} y={y + h / 2 + 14} textAnchor="middle">{t2}</text></g>
+  );
+  const checks: ['buyer' | 'seller' | 'terms', string, number][] = [['buyer', 'Buyer agent authority', 124], ['seller', 'Seller agent authority', 160], ['terms', 'Same signed terms', 196]];
   return (
-    <div className="landing">
-      <header className="landing-top"><div className="landing-top-inner">
-        <span className="brand"><Monogram size={30} />PayeeProof</span><span style={{ flex: 1 }} />
-        {me.user ? <button className="btn btn-sm btn-primary" onClick={() => nav('/app')}>My Dashboard</button> : <button className="btn btn-sm btn-quiet" onClick={() => setAuth('login')}>Sign in</button>}
-      </div></header>
-      <main id="main">
-        <section className="first" aria-labelledby="alarm-h">
-          <h1 id="alarm-h" className="alarm-title">Businesses lost $3 billion to fake payment emails last year.</h1>
-          <div className="alarm-grid">
-            {STATS.map((x) => (
-              <div key={x.v} className="alarm-cell">
-                <div className="alarm-v">{x.v}</div>
-                <p>{x.t}</p>
-                <a className="alarm-src" href={x.href} target="_blank" rel="noreferrer">{x.src}</a>
-              </div>
-            ))}
-          </div>
-          <div className="relief">
-            <Monogram size={64} animate bg="#e8f5ef" title="PayeeProof monogram" />
-            <div>
-              <h2>Don’t worry, you’re protected with PayeeProof.</h2>
-              <p>The secured AI payment harness you can rely on. Every payment, from a person or an AI agent, is verified and gated before it can reach PayPal.</p>
-            </div>
-            <div className="relief-act">
-              <button className="btn btn-primary btn-lg" onClick={me.user ? () => nav('/app') : start} disabled={busy}>{busy ? 'Preparing…' : 'My Dashboard'}</button>
-              {!me.user && <span className="tiny muted">Demo workspace, PayPal sandbox. <button className="linkish" onClick={() => setAuth('signup')}>Create your own</button></span>}
-            </div>
-            {error && <div className="notice error" style={{ gridColumn: '1 / -1' }} role="alert">{error}</div>}
-          </div>
-        </section>
-
-        <section className="explain" aria-labelledby="states-h">
-          <h2 id="states-h">Every payment gets one clear answer</h2>
-          <p className="explain-sub">PayeeProof checks who is asking, who would receive the money and whether the details match your records. Then it gives one of four answers, and shows why.</p>
-          <div className="states">
-            {DECISIONS.map((d) => (
-              <div key={d.k} className={`state s-${d.k}`}>
-                <div className="state-name">{d.name}</div>
-                <p>{d.means}</p>
-                <p className="state-next">{d.next}</p>
-                <p className="state-eg">{d.eg}</p>
-              </div>
-            ))}
-          </div>
-          <p className="explain-note">Allowed is not the same as paid. A payment is marked completed only after PayPal confirms it.</p>
-        </section>
-
-        <section className="explain" aria-labelledby="agents-h">
-          <h2 id="agents-h">How AI agents work with PayeeProof</h2>
-          <p className="explain-sub">Agents can ask for a payment. They can never approve or send one themselves.</p>
-          <ol className="agent-steps">
-            {AGENT_STEPS.map(([t, d]) => <li key={t}><strong>{t}</strong><span>{d}</span></li>)}
-          </ol>
-        </section>
-
-        <section className="gate-demo">
-          <div>
-            <h2 className="h1">One gate. No way around it.</h2>
-            <p className="lead" style={{ marginTop: 16 }}>Every payment, from a person or an agent, passes through the same server-side gate. It checks the signed decision, runs the policy again on live data, and claims the payment once. Only the gate holds PayPal credentials. AI models never see them.</p>
-          </div>
-          <div className="verdict HOLD" aria-label="Example of a held payment">
-            <div className="word">Held</div>
-            <p className="why">The invoice asks for payment to a PayPal account Northwind has never used.</p>
-            <div className="path"><ol>{STEPS.map(([t, s], i) => <li key={t} className={i < 3 ? 'done' : i === 3 ? 'blocked' : 'unreached'}><span className="dot" />{t}<span className="sub">{i === 3 ? 'Stopped here. The executor was not called.' : s}</span></li>)}</ol></div>
-          </div>
-        </section>
-
-        <section style={{ marginTop: 72 }}>
-          <h2 className="h2">Try to break it</h2>
-          <p className="lead" style={{ marginTop: 12 }}>Security Testing runs 29 attacks and legitimate payments through the same pipeline as your own uploads: swapped destinations, lookalike domains, duplicates, prompt injection, forged agents, replays and bypass attempts. You can also upload your own files.</p>
-          <p className="disclaimer" style={{ marginTop: 28 }}>PayeeProof is an independent hackathon project. It is not affiliated with, endorsed by or certified by PayPal. Payments use the PayPal sandbox and move no real money. No system detects every fraud; PayeeProof fails closed when it cannot verify something critical, and shows its evidence for every decision.</p>
-        </section>
-      </main>
-      {auth && <AuthModal mode={auth} setMode={setAuth} />}
-    </div>
+    <svg viewBox="0 0 560 330" role="img" aria-label={`Two agents from different organizations pass through one ProxyProof boundary. ${c.reason}`}>
+      {box(8, 14, 150, 52, 'Buyer organization', 'signs a purchase mandate')}
+      {box(402, 14, 150, 52, 'Seller organization', 'signs a business delegation')}
+      {box(8, 98, 150, 64, 'Buyer’s AI agent', 'any platform', c.action === 'MAKE' && phase >= 1 ? 'var(--green-line)' : undefined)}
+      {box(402, 98, 150, 64, 'Seller’s AI agent', 'any platform', c.action === 'COLLECT' && phase >= 1 ? 'var(--green-line)' : undefined)}
+      <line className="fv-wire" x1="83" y1="66" x2="83" y2="98" /><line className="fv-wire" x1="477" y1="66" x2="477" y2="98" />
+      <line className={`fv-wire ${state('buyer') === 'pass' ? 'fv-pass' : ''}`} x1="158" y1="130" x2="200" y2="130" style={state('buyer') === 'fail' ? { stroke: 'var(--red)' } : undefined} />
+      <line className={`fv-wire ${state('seller') === 'pass' ? 'fv-pass' : ''}`} x1="360" y1="130" x2="402" y2="130" style={state('seller') === 'fail' ? { stroke: 'var(--red)' } : undefined} />
+      <rect className="fv-layer" x="200" y="92" width="160" height="128" rx="14" />
+      <text x="280" y="86" textAnchor="middle" style={{ font: '700 12px var(--font)', fill: 'var(--green-deep)' }}>ProxyProof boundary</text>
+      {checks.map(([k, label, y]) => (
+        <g key={k}>
+          <circle cx="218" cy={y} r="7" style={{ fill: state(k) === 'idle' ? '#fff' : col(state(k)), stroke: col(state(k)), strokeWidth: 2, transition: 'fill .2s, stroke .2s' }} />
+          <text x="232" y={y + 4} style={{ font: '600 10.5px var(--font)', fill: state(k) === 'fail' ? 'var(--red)' : 'var(--ink-2)' }}>{label}</text>
+        </g>
+      ))}
+      <line className={`fv-wire ${open ? 'fv-pass' : ''}`} x1="280" y1="220" x2="280" y2="250" />
+      {box(190, 250, 180, 52, 'PayPal sandbox checkout', open ? 'buyer approves on PayPal' : 'not reached', open ? 'var(--green-line)' : undefined)}
+      <text x="280" y="324" textAnchor="middle" style={{ font: '600 12px var(--font)', fill: !c.pass ? 'var(--red)' : 'var(--green-deep)', opacity: done ? 1 : 0, transition: 'opacity .3s' }}>{c.reason}</text>
+    </svg>
   );
 }
 
-function AuthModal({ mode, setMode }: { mode: 'login' | 'signup'; setMode: (m: 'login' | 'signup' | null) => void }) {
+export function Landing() {
   const nav = useNavigate();
-  const { refresh } = useMe();
-  const [f, setF] = useState({ email: '', password: '', name: '', workspaceName: '' });
-  const [error, setError] = useState<string | null>(null);
+  const { me, refresh } = useMe();
+  const reduce = usePrefersReducedMotion();
+  const [step, setStep] = useState(0);
+  const [phase, setPhase] = useState(reduce ? 5 : 0);
   const [busy, setBusy] = useState(false);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true); setError(null);
-    try { await api.post(mode === 'login' ? '/api/auth/login' : '/api/auth/signup', f); await refresh(); nav('/app'); }
-    catch (err: any) { setError(err.message); } finally { setBusy(false); }
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (reduce) { setPhase(5); return; }
+    setPhase(0);
+    const timers = [300, 1000, 1500, 2000, 2500].map((ms, i) => window.setTimeout(() => setPhase(i + 1), ms));
+    timers.push(window.setTimeout(() => setStep((s) => (s + 1) % CYCLE.length), STEP_MS));
+    return () => timers.forEach(clearTimeout);
+  }, [step, reduce]);
+
+  const open = async () => {
+    if (me.user) return nav('/app');
+    setBusy(true); setError(null);
+    try { await api.post('/api/demo/start'); await refresh(); nav('/app'); } catch (e: any) { setError(e.message); setBusy(false); }
   };
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const action = CYCLE[step].action;
+
   return (
-    <Modal title={mode === 'login' ? 'Sign in' : 'Create a workspace'} onClose={() => setMode(null)}>
-      <form className="stack-sm" onSubmit={submit} style={{ marginTop: 12 }}>
-        {mode === 'signup' && <><label className="field">Your name<input className="input" required value={f.name} onChange={set('name')} autoComplete="name" /></label>
-          <label className="field">Business name<input className="input" required value={f.workspaceName} onChange={set('workspaceName')} /></label></>}
-        <label className="field">Email<input className="input" type="email" required value={f.email} onChange={set('email')} autoComplete="email" /></label>
-        <label className="field">Password<span className="hint">{mode === 'signup' ? 'At least 10 characters.' : ''}</span><input className="input" type="password" required minLength={mode === 'signup' ? 10 : 1} value={f.password} onChange={set('password')} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} /></label>
-        {error && <div className="notice error" role="alert">{error}</div>}
-        <div className="row" style={{ marginTop: 6 }}>
-          <button className="btn btn-primary" disabled={busy}>{mode === 'login' ? 'Sign in' : 'Create workspace'}</button>
-          <button type="button" className="btn btn-quiet" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>{mode === 'login' ? 'Create a workspace instead' : 'I already have an account'}</button>
-        </div>
-      </form>
-    </Modal>
+    <div className="landing">
+      <header className="top"><div className="top-inner">
+        <span className="brand"><Monogram size={30} />ProxyProof</span><span className="spacer" />
+        <Link className="btn btn-sm btn-quiet" to="/architecture">Architecture</Link>
+        <button className="btn btn-sm btn-secondary" onClick={open} disabled={busy}>{me.user ? 'Open dashboard' : 'Explore Live Demo'}</button>
+      </div></header>
+      <main id="main">
+        <section className="hero">
+          <div>
+            <Question action={action} />
+            <div className="persp-line">
+              <span className="persp"><i />{reduce ? 'Seller and buyer perspectives' : PERSPECTIVE[action].label}</span>
+              <p>{reduce ? `${PERSPECTIVE.MAKE.text} ${PERSPECTIVE.COLLECT.text}` : PERSPECTIVE[action].text}</p>
+            </div>
+            <p className="lead">Verify both sides before AI agents transact.</p>
+            <div className="row cta">
+              <button className="btn btn-primary btn-lg" onClick={open} disabled={busy}>{busy ? 'Preparing the demo…' : 'Explore Live Demo'}</button>
+              <Link className="btn btn-secondary btn-lg" to="/architecture">Explore the Architecture</Link>
+            </div>
+            {error && <p className="notice error" style={{ marginTop: 12 }} role="alert">{error}</p>}
+          </div>
+          <figure className="flowviz grid-bg" style={{ margin: 0 }}>
+            <BilateralViz step={reduce ? 0 : step} phase={phase} />
+            <figcaption>Illustration of the flow. The live demo runs real agents through the real checks.</figcaption>
+          </figure>
+        </section>
+
+        <section className="sec" aria-labelledby="problem-h">
+          <h2 id="problem-h">Two agents, two organizations, one payment</h2>
+          <p className="sub">When a buyer’s AI agent buys from a seller’s AI agent, each side has a question it cannot answer alone. A buyer’s mandate does not prove the seller’s agent speaks for the business. A seller’s invoice does not prove the buyer’s agent may commit the buyer. And neither proves both agents are agreeing to the same terms. ProxyProof checks each side’s authority independently, matches both to one transaction, and only then lets a protected payment start.</p>
+        </section>
+
+        <section className="sec" aria-labelledby="two-h">
+          <h2 id="two-h">One question, asked from both sides</h2>
+          <div className="two">
+            <div className="side-card">
+              <div className="who">SELLER PERSPECTIVE</div>
+              <h3>Is this AI agent authorized to make payment?</h3>
+              <ul><li>The buyer organization signed a mandate for this exact agent key</li><li>Purchase permission, limit, categories, approved sellers</li><li>Not expired, not revoked, not replayed</li><li>It signed the same terms the seller offered</li></ul>
+            </div>
+            <div className="side-card">
+              <div className="who">BUYER PERSPECTIVE</div>
+              <h3>Is this AI agent authorized to collect payment?</h3>
+              <ul><li>The seller business signed a delegation for this exact agent key</li><li>Permission to quote, invoice and request payment, within limits</li><li>Payment only to the account the business enrolled</li><li>It signed the same terms the buyer authorized</li></ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="sec" aria-labelledby="how-h">
+          <h2 id="how-h">How it works</h2>
+          <ol className="steps">
+            <li><span className="n">1</span><strong>Organizations delegate</strong>Each organization connects its agent and signs what it may do. Connected is not authorized.</li>
+            <li><span className="n">2</span><strong>Both agents sign</strong>The seller’s agent signs the offer; the buyer’s agent signs the same terms hash. Each with its own key.</li>
+            <li><span className="n">3</span><strong>ProxyProof decides</strong>Both authority chains, the term match and the policy: Allow, Hold, Review or Deny, with exact reasons.</li>
+            <li><span className="n">4</span><strong>Only then, payment</strong>A single-use permit for those exact terms opens a PayPal sandbox checkout. Paid only when PayPal confirms.</li>
+          </ol>
+        </section>
+
+        <section className="sec" aria-labelledby="agents-h">
+          <h2 id="agents-h">Bring agents from anywhere</h2>
+          <p className="sub">ProxyProof does not build agents. Agents created in Claude, ChatGPT, Grok, Gemini or any framework connect through ProxyProof’s MCP connector or REST API. Tested live today: Claude Code over the MCP connector, and independently written agents over the REST API. Other platforms are documented with their real limits. ProxyProof enforces only the protected actions routed through it; it does not control an agent’s other tools.</p>
+        </section>
+
+        <section className="sec" aria-labelledby="std-h">
+          <h2 id="std-h">Built on existing standards, not replacing them</h2>
+          <p className="sub">AP2, ACP, UCP, Visa Trusted Agent Protocol, Verifiable Intent, AuthZEN and PayPal’s own agent tools each cover part of agentic commerce. ProxyProof composes established building blocks to verify both sides of one transaction. It claims no conformance it has not tested. <Link to="/architecture">See what exists and what ProxyProof adds</Link>.</p>
+        </section>
+
+        <section className="final">
+          <h2>Verify both sides before AI agents transact.</h2>
+          <button className="btn btn-lg" onClick={open} disabled={busy}>Explore Live Demo</button>
+        </section>
+        <p className="disclaimer">ProxyProof is an independent hackathon project, not affiliated with or endorsed by PayPal, Anthropic, OpenAI, xAI, Google, Visa or Mastercard. Product names are used only to describe compatibility. Payments use the PayPal sandbox and move no real money. No system can promise to stop every fraud.</p>
+      </main>
+    </div>
   );
 }

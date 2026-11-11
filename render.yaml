@@ -9,13 +9,13 @@ services:
     envVars:
       - key: PUBLIC_URL
         sync: false
-      - key: SERVER_SECRET
-        generateValue: true
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
       - key: PAYPAL_SANDBOX_RECEIVER_EMAIL
+        sync: false
+      - key: PAYPAL_SANDBOX_MERCHANT_EMAIL
         sync: false
       - key: PAYPAL_WEBHOOK_ID
         sync: false
