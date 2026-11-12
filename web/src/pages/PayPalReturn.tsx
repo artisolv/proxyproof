@@ -12,7 +12,7 @@ export function PayPalReturn() {
     <div className="landing"><main style={{ paddingTop: 64, maxWidth: 640 }}>
       <h1 style={{ fontSize: 26, fontWeight: 800 }}>Completing the payment</h1>
       <p style={{ marginTop: 10, color: 'var(--ink-2)' }}>{state.error ? state.error : !state.status ? 'Checking the agent’s authority again, then asking PayPal to capture…' : state.status === 'COMPLETED' ? 'PayPal confirmed the payment.' : `PayPal reports: ${state.status.toLowerCase().replace(/_/g, ' ')}.`}</p>
-      <Link className="btn btn-primary" style={{ marginTop: 20 }} to={id ? `/app?tx=${id}` : '/app'}>Back to the dashboard</Link>
+      <Link className="btn btn-primary" style={{ marginTop: 20 }} to="/app">Back to the scenario lab</Link>
     </main></div>
   );
 }

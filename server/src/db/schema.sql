@@ -117,3 +117,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
   payload TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE (workspace_id, seq)
 );
+
+-- Scenario runs: each run plays a scenario in its own isolated workspace; the owner is the session's workspace.
+CREATE TABLE IF NOT EXISTS lab_runs (id TEXT PRIMARY KEY, owner_workspace_id TEXT NOT NULL, workspace_id TEXT NOT NULL, scenario_id TEXT NOT NULL, result TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS lab_runs_owner ON lab_runs (owner_workspace_id, created_at);

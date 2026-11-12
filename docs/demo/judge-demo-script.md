@@ -6,11 +6,15 @@
 - See one working end-to-end transaction and one blocked attack.
 
 ## 0:00 Landing (10 seconds)
-- The headline alternates between **MAKE** and **COLLECT**:
-  - Seller perspective: "Is this buyer's agent authorized to make this purchase?"
-  - Buyer perspective: "Is this seller's agent authorized to collect payment?"
-- The tagline reads "Verify both sides before AI agents transact."
-- The illustration shows two organizations, each with its own agent, passing through one ProxyProof boundary before PayPal checkout.
+- The hero is split diagonally into two worlds: **Claimed.** (an agent's word) and **Proven.** (what ProxyProof checks).
+- Below them, one illustrative $240 payment plays out:
+  1. The paying agent's request is held at the ProxyProof boundary.
+  2. Identity is checked, then the payer's mandate (its card turns the first green).
+  3. Then the recipient's delegation (its card turns the second green).
+  4. ProxyProof matches the terms and account, and decides Allow with a single-use permit.
+  5. The PayPal sandbox checkout completes, and the whole hero turns green.
+- **Replay the payment** runs it again.
+- Further down, "How one payment gets proven" carries the MAKE / COLLECT question and the six steps, each with the reason codes that stop a payment.
 
 ## 0:10 Explore the Architecture (about 40 seconds)
 - **End-to-end flow:** each stage shows what already exists, what ProxyProof adds, why it matters, the test that proves it, and what is not implemented.

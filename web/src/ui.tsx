@@ -33,7 +33,7 @@ export const PERSPECTIVE: Record<Action, { label: string; text: string }> = {
  * "Is this AI agent authorized to [MAKE / COLLECT] payment?" Only the action word moves, inside a fixed slot.
  * Screen readers get the whole question once. With reduced motion, both words are shown and nothing animates.
  */
-export function Question({ action, as: Tag = 'h1', className = '' }: { action: Action; as?: 'h1' | 'h2'; className?: string }) {
+export function Question({ action, as: Tag = 'h1', className = '' }: { action: Action; as?: 'h1' | 'h2' | 'h3'; className?: string }) {
   const reduce = usePrefersReducedMotion();
   const [state, setState] = useState<{ current: Action; prev: Action | null; n: number }>({ current: action, prev: null, n: 0 });
   const refs = { MAKE: useRef<HTMLSpanElement>(null), COLLECT: useRef<HTMLSpanElement>(null) };

@@ -57,7 +57,7 @@ code, .mono { font-family: var(--mono); font-size: 0.85em; }
 /* Top bar */
 .top { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line-soft); }
 .top-inner { max-width: 1440px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 16px; }
-.brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; text-decoration: none; }
+.brand { display: inline-flex; align-items: center; text-decoration: none; color: var(--ink); }
 .spacer { flex: 1; }
 .seg { display: inline-flex; padding: 3px; border-radius: var(--r-full); background: var(--mist); border: 1px solid var(--line-soft); }
 .seg button { border: 0; background: transparent; padding: 6px 18px; border-radius: var(--r-full); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; cursor: pointer; color: var(--muted); }
@@ -232,13 +232,13 @@ code, .mono { font-family: var(--mono); font-size: 0.85em; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0ms !important; transition-duration: 0.001ms !important; }
 }
-.pp-mark .p1, .pp-mark .p2 { transition: none; }
-.pp-mark.animate .p1 { animation: pp-in-left 0.7s var(--ease) both; }
-.pp-mark.animate .p2 { animation: pp-in-right 0.7s var(--ease) both; }
-.pp-mark.animate .tick { stroke-dasharray: 20; animation: pp-tick 0.45s ease-out 0.6s both; }
-@keyframes pp-in-left { 0% { transform: translate(-7px, 0); opacity: 0; } 60% { opacity: 1; } }
-@keyframes pp-in-right { 0% { transform: translate(7px, 0); opacity: 0; } 60% { opacity: 1; } }
-@keyframes pp-tick { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
+.pp-mark { flex: none; display: block; }
+.pp-mark.animate .t1, .pp-mark.animate .t2 { stroke-dasharray: 34; }
+.pp-mark.animate .t1 { animation: pp-draw .45s ease-out .1s both; }
+.pp-mark.animate .t2 { animation: pp-draw .45s ease-out .45s both; }
+@keyframes pp-draw { from { stroke-dashoffset: 34; } to { stroke-dashoffset: 0; } }
+/* The lock-up: mark plus name. Set once here so every page's header matches. */
+.wordmark { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font); font-weight: 700; font-size: 19px; letter-spacing: -0.025em; line-height: 1; }
 
 /* Architecture explorer */
 .legend { margin-top: 14px; gap: 8px; }

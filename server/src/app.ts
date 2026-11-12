@@ -14,6 +14,7 @@ import { approveReview, issueChallenge, listTransactions, proofBundle, recheck, 
 import { SELLER_EXTRA, SIDE_CHECKS } from './trust/party.js';
 import { BEHAVIOURS, buyerAccept, sellerOffer } from './runtime/testAgent.js';
 import { mountMcp } from './mcp/server.js';
+import { approveRun, captureRun, getRun, listRuns, listScenarios, runScenario, type LabCtx } from './scenarios/engine.js';
 import { GateRefused, captureCheckout, executeWithPermit, handleWebhook, syncPayment, type ExecutorCtx } from './executor/gate.js';
 import { createPayPal, type PayPal } from './executor/paypal.js';
 
@@ -267,6 +268,19 @@ export function createApp(deps: AppDeps) {
     const r = await inProcess('POST', `/api/v1/workspaces/${s.workspaceId}/transactions/${b.transaction_id}/execute`, { permit: b.permit });
     return c.json(r.json, r.status as any);
   });
+  // ---------- Scenario lab: real-world scenarios, each played in its own isolated world through the public agent API ----------
+  const lab: LabCtx = { db, publicUrl: config.PUBLIC_URL, api: inProcess, executor: ctx, sellerAccount, buyerEmail };
+  app.get('/api/lab/scenarios', auth, (c) => c.json(listScenarios()));
+  app.get('/api/lab/runs', auth, (c) => c.json({ runs: listRuns(db, c.get('session').workspaceId) }));
+  app.post('/api/lab/runs', auth, async (c) => {
+    const s = c.get('session');
+    if (!limit(`lab:${s.workspaceId}`, 120, 3_600_000)) throw new Forbidden('Too many scenario runs. Try again later.');
+    const b = z.object({ prompt: z.string().max(40), complication: z.string().max(40) }).parse(await c.req.json());
+    return c.json(await runScenario(lab, s.workspaceId, b.prompt, b.complication, { pause: true }), 201);
+  });
+  app.get('/api/lab/runs/:id', auth, async (c) => c.json(await getRun(lab, c.get('session').workspaceId, c.req.param('id'), { sync: c.req.query('sync') === '1' })));
+  app.post('/api/lab/runs/:id/approve', auth, async (c) => c.json(await approveRun(lab, c.get('session').workspaceId, c.req.param('id'))));
+  app.post('/api/lab/runs/:id/capture', auth, async (c) => c.json(await captureRun(lab, c.get('session').workspaceId, c.req.param('id'))));
   const view = (ws: string, id: string) => transactionView(db, one<any>(db, 'SELECT * FROM commerce_transactions WHERE id = ? AND workspace_id = ?', id, ws));
   app.post('/api/transactions/:id/review', auth, async (c) => { const s = c.get('session'); const r = await approveReview(ctx, s.workspaceId, c.req.param('id'), { id: s.userId, name: s.name }); return c.json({ ...view(s.workspaceId, c.req.param('id')), permit: r.permit }); });
   app.post('/api/transactions/:id/recheck', auth, async (c) => { const s = c.get('session'); const r = await recheck(ctx, s.workspaceId, c.req.param('id'), { type: 'USER', id: s.userId }); return c.json({ ...view(s.workspaceId, c.req.param('id')), permit: r.permit }); });

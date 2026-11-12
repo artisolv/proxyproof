@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { Monogram } from '../Monogram';
+import { Wordmark } from '../Monogram';
 
 type Status = 'Existing' | 'Integration' | 'Implementation' | 'Experimental' | 'Future';
 const STATUS_HELP: Record<Status, string> = {
@@ -56,7 +56,7 @@ export function Explorer() {
   return (
     <div className="landing explorer">
       <header className="top"><div className="top-inner">
-        <Link className="brand" to="/"><Monogram size={30} />ProxyProof</Link><span className="spacer" />
+        <Link className="brand" to="/" aria-label="ProxyProof home"><Wordmark ring /></Link><span className="spacer" />
         <Link className="btn btn-sm btn-primary" to="/">Back</Link>
       </div></header>
       <main>

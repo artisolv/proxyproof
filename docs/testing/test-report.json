@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-08T12:26:50.520Z",
+  "generated_at": "2026-11-12T06:15:58.708Z",
   "environment": "Node v24.21.0, darwin arm64, Apple M4, in-memory SQLite, PayPal mocked on loopback",
-  "total": 30,
-  "passed": 30,
+  "total": 64,
+  "passed": 64,
   "failed": 0,
   "properties": [
     {
@@ -37,7 +37,7 @@
     },
     {
       "name": "Revocation and expiry enforced, including at time of use",
-      "tests": 4,
+      "tests": 7,
       "failed": 0
     },
     {
@@ -75,27 +75,27 @@
     {
       "name": "bilateral verification › 1. both sides valid: ALLOW with both authority chains and the match recorded, and a single-use permit",
       "status": "passed",
-      "ms": 57
+      "ms": 63
     },
     {
       "name": "bilateral verification › 2. seller agent not authorized to invoice: DENY, never presented as a verified seller request",
       "status": "passed",
-      "ms": 26
+      "ms": 36
     },
     {
       "name": "bilateral verification › 3. buyer over its limit: DENY; between the approval threshold and the limit: REVIEW, then ALLOW after approval",
       "status": "passed",
-      "ms": 28
+      "ms": 32
     },
     {
       "name": "bilateral verification › 4. same owner, different agent: the research agent fails on authority, the procurement agent passes",
       "status": "passed",
-      "ms": 26
+      "ms": 27
     },
     {
       "name": "bilateral verification › 5. terms changed after approval: the earlier authorization and permit no longer apply",
       "status": "passed",
-      "ms": 26
+      "ms": 29
     },
     {
       "name": "bilateral verification › 5b. a buyer agent that authorizes different terms from those on the table is refused",
@@ -105,57 +105,57 @@
     {
       "name": "bilateral verification › 6. wrong payment destination: DENY before any payment",
       "status": "passed",
-      "ms": 10
+      "ms": 11
     },
     {
       "name": "bilateral verification › 7. expired and revoked authority, on both sides",
       "status": "passed",
-      "ms": 32
+      "ms": 37
     },
     {
       "name": "bilateral verification › 8. invalid seller signature, forged or self-issued authority, unknown keys and missing proof are rejected",
       "status": "passed",
-      "ms": 49
+      "ms": 56
     },
     {
       "name": "bilateral verification › 9. replayed requests are refused on both sides",
       "status": "passed",
-      "ms": 17
+      "ms": 19
     },
     {
       "name": "bilateral verification › unverified organizations are held, not trusted and not denied",
       "status": "passed",
-      "ms": 9
+      "ms": 10
     },
     {
       "name": "bilateral verification › 11. verification dependency unavailable: HOLD, then recovery after it returns",
       "status": "passed",
-      "ms": 15
+      "ms": 17
     },
     {
       "name": "bilateral verification › expired terms cannot be accepted",
       "status": "passed",
-      "ms": 11
+      "ms": 15
     },
     {
       "name": "bilateral verification › the path stops at the first failed check on each side",
       "status": "passed",
-      "ms": 10
+      "ms": 13
     },
     {
       "name": "protected execution boundary › a valid permit opens a PayPal checkout; COMPLETED only after PayPal confirms the capture",
       "status": "passed",
-      "ms": 67
+      "ms": 79
     },
     {
       "name": "protected execution boundary › 12. bypass: no permit, a forged permit, or a permit for another transaction is refused, and PayPal is never called",
       "status": "passed",
-      "ms": 41
+      "ms": 50
     },
     {
       "name": "protected execution boundary › 9. a permit is single use: a second execution is refused and recorded",
       "status": "passed",
-      "ms": 23
+      "ms": 31
     },
     {
       "name": "protected execution boundary › concurrent executions with two valid permits create one checkout",
@@ -165,27 +165,27 @@
     {
       "name": "protected execution boundary › time of use: revoking the seller agent after approval stops execution at the boundary",
       "status": "passed",
-      "ms": 19
+      "ms": 20
     },
     {
       "name": "protected execution boundary › revoking after checkout opened prevents capture",
       "status": "passed",
-      "ms": 22
+      "ms": 23
     },
     {
       "name": "protected execution boundary › unverified webhooks change nothing",
       "status": "passed",
-      "ms": 18
+      "ms": 21
     },
     {
       "name": "protected execution boundary › the evidence bundle links both chains, verifies, and detects tampering",
       "status": "passed",
-      "ms": 21
+      "ms": 20
     },
     {
       "name": "architecture › only the executor and app wiring can reach the PayPal client",
       "status": "passed",
-      "ms": 1
+      "ms": 2
     },
     {
       "name": "architecture › the MCP connector cannot reach the PayPal client or private key tables directly",
@@ -195,27 +195,197 @@
     {
       "name": "an independently developed agent on the REST API › registers with its own key, waits for its organization, accepts a verified invoice and checks the receipt",
       "status": "passed",
-      "ms": 59
+      "ms": 66
     },
     {
       "name": "an independently developed agent on the REST API › rejects a registration carrying a private key",
       "status": "passed",
-      "ms": 8
+      "ms": 11
+    },
+    {
+      "name": "scenario engine › lists requests and complications without outcomes",
+      "status": "passed",
+      "ms": 33
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Everything genuine",
+      "status": "passed",
+      "ms": 52
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Bank details changed",
+      "status": "passed",
+      "ms": 18
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Invoice altered in transit",
+      "status": "passed",
+      "ms": 14
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Agents disagree on price",
+      "status": "passed",
+      "ms": 16
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Forged authority",
+      "status": "passed",
+      "ms": 23
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Lookalike supplier",
+      "status": "passed",
+      "ms": 14
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Hidden prompt injection",
+      "status": "passed",
+      "ms": 13
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Agent revoked mid-payment",
+      "status": "passed",
+      "ms": 18
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Same payment sent twice",
+      "status": "passed",
+      "ms": 21
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Revocation check offline",
+      "status": "passed",
+      "ms": 20
+    },
+    {
+      "name": "scenario engine › Order this week’s coffee for breakfast × Authorized, but wrong item",
+      "status": "passed",
+      "ms": 19
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Everything genuine",
+      "status": "passed",
+      "ms": 21
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Bank details changed",
+      "status": "passed",
+      "ms": 12
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Invoice altered in transit",
+      "status": "passed",
+      "ms": 9
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Agents disagree on price",
+      "status": "passed",
+      "ms": 12
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Forged authority",
+      "status": "passed",
+      "ms": 12
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Lookalike supplier",
+      "status": "passed",
+      "ms": 13
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Hidden prompt injection",
+      "status": "passed",
+      "ms": 13
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Agent revoked mid-payment",
+      "status": "passed",
+      "ms": 16
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Same payment sent twice",
+      "status": "passed",
+      "ms": 21
+    },
+    {
+      "name": "scenario engine › Pay the monthly supply bill × Revocation check offline",
+      "status": "passed",
+      "ms": 19
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Everything genuine",
+      "status": "passed",
+      "ms": 18
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Bank details changed",
+      "status": "passed",
+      "ms": 9
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Invoice altered in transit",
+      "status": "passed",
+      "ms": 9
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Agents disagree on price",
+      "status": "passed",
+      "ms": 13
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Forged authority",
+      "status": "passed",
+      "ms": 10
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Lookalike supplier",
+      "status": "passed",
+      "ms": 11
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Hidden prompt injection",
+      "status": "passed",
+      "ms": 11
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Agent revoked mid-payment",
+      "status": "passed",
+      "ms": 16
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Same payment sent twice",
+      "status": "passed",
+      "ms": 16
+    },
+    {
+      "name": "scenario engine › Pay Tuesday’s machine service invoice × Revocation check offline",
+      "status": "passed",
+      "ms": 19
+    },
+    {
+      "name": "scenario engine › refuses combinations that do not apply",
+      "status": "passed",
+      "ms": 6
+    },
+    {
+      "name": "scenario engine › keeps runs private to the workspace that started them",
+      "status": "passed",
+      "ms": 19
     },
     {
       "name": "ProxyProof MCP connector › refuses a connection without a valid ProxyProof connection token",
       "status": "passed",
-      "ms": 34
+      "ms": 43
     },
     {
       "name": "ProxyProof MCP connector › refuses requests from a foreign browser origin",
       "status": "passed",
-      "ms": 8
+      "ms": 12
     },
     {
       "name": "ProxyProof MCP connector › connected is not authorized; the organization approves; then two MCP agents complete one bilateral transaction",
       "status": "passed",
-      "ms": 95
+      "ms": 107
     },
     {
       "name": "ProxyProof MCP connector › a seller agent cannot use buyer tools and vice versa",
@@ -226,7 +396,7 @@
   "latency": {
     "samples": 40,
     "what": "seller offer + buyer acceptance via the public API, including signing, both-side verification and matching",
-    "p50_ms": 2.9,
-    "p95_ms": 4.6
+    "p50_ms": 3.2,
+    "p95_ms": 5
   }
 }

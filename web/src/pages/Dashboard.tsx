@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, money, toMinor, when } from '../api';
-import { Monogram } from '../Monogram';
+import { Monogram, Wordmark } from '../Monogram';
 import { useMe } from '../main';
 import { Chip, Modal, PERSPECTIVE, Question, usePrefersReducedMotion } from '../ui';
 
@@ -153,11 +153,12 @@ export function Dashboard() {
   return (
     <div className="dash">
       <header className="top"><div className="top-inner">
-        <Link className="brand" to="/"><Monogram size={28} />ProxyProof</Link>
+        <Link className="brand" to="/" aria-label="ProxyProof home"><Wordmark size={28} ring /></Link>
         <div className="seg" role="group" aria-label="Viewpoint">
           {(['BUYER', 'SELLER'] as Mode[]).map((m) => <button key={m} aria-pressed={mode === m} onClick={() => switchMode(m)}>{m} VIEW</button>)}
         </div>
         <span className="spacer" />
+        <Link className="btn btn-secondary btn-sm" to="/app">Scenario lab</Link>
         <button className="btn btn-primary btn-sm" onClick={() => setModal('connect')}>Connect an agent</button>
         <button className="btn btn-quiet btn-sm" onClick={() => setModal('agents')}>Agents{pendingApprovals ? ` (${pendingApprovals} to approve)` : ''}</button>
         <button className="btn btn-quiet btn-sm" onClick={() => setModal('api')}>Agent API</button>

@@ -58,7 +58,7 @@ Yes. ProxyProof verifies both chains and the match, issues a permit, and the exe
 
 | Decision | Reason |
 |---|---|
-| Kept the PayeeProof monogram (two linked Ps) for ProxyProof | It still reads as "PP". No PayPal assets are used. |
+| Logo: a double check mark (deep green, then bright green) in a white circle, with the wordmark set in Schibsted Grotesk | One tick per side of the payment, matching the two greens the landing page uses as each agent is verified. Replaced the earlier two-P monogram, which sat too close to "PP" payment marks. No PayPal assets are used. |
 | Rebuilt rather than renamed. The old one-sided verifier, runtime and pages were removed; the earlier versions remain in git (commits `213c93b` and before) | The plan requires a coherent product, not retained features |
 | MCP SDK v2 (`@modelcontextprotocol/server` 2.4.0), stateless Streamable HTTP, spec 2026-07-28 with legacy fallback | This is the current spec. Gemini requires Streamable HTTP. |
 | Bearer connection tokens for MCP; OAuth 2.1 with Protected Resource Metadata deferred | Works with Claude Code today. Labelled honestly as "connection token" assurance. |

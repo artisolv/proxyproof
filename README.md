@@ -58,7 +58,8 @@ npm run build && npm start
 ```
 
 Open http://localhost:8787:
-- **Explore Live Demo** gives you an isolated workspace with two buyer organizations, two seller organizations, and agents in every lifecycle state.
+- **Explore Live Demo** opens the **scenario lab**: 12 real-world scenarios (payout redirection, altered invoices, forged mandates, lookalike suppliers, prompt-injected agents, revoked agents, duplicate payments and more), each played in a fresh world through ProxyProof's real checks. See [docs/scenarios/real-world-scenarios.md](docs/scenarios/real-world-scenarios.md) for the scenarios and their sources.
+- **Console** (from the lab) is the hands-on dashboard: connect your own agents, approve delegations, run single steps.
 - **Explore the Architecture** opens the architecture explorer.
 
 To enable the PayPal sandbox, copy `.env.example` to `.env` and set:
@@ -81,7 +82,8 @@ claude mcp add --transport http proxyproof http://localhost:8787/mcp --header "A
 npm test
 ```
 
-There are 30 tests, all offline, using a loopback PayPal mock. They cover:
+There are 44 tests, all offline, using a loopback PayPal mock. They cover:
+- every scenario in the lab, played through the real verification
 - the bilateral scenarios
 - the execution boundary: bypass, single use, time-of-use revocation, concurrency and capture
 - evidence-bundle tamper detection

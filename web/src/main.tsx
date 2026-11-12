@@ -7,6 +7,7 @@ import { Landing } from './pages/Landing';
 import { Dashboard } from './pages/Dashboard';
 import { PayPalReturn } from './pages/PayPalReturn';
 import { Explorer } from './pages/Explorer';
+import { Lab } from './pages/Lab';
 
 export type Me = { user: { name: string; workspaceId: string } | null };
 const MeCtx = createContext<{ me: Me; refresh: () => Promise<void> }>({ me: { user: null }, refresh: async () => {} });
@@ -22,7 +23,8 @@ function Root() {
     <MeCtx.Provider value={{ me, refresh }}>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/app" element={me.user ? <Dashboard /> : <Navigate to="/" replace />} />
+        <Route path="/app" element={me.user ? <Lab /> : <Navigate to="/" replace />} />
+        <Route path="/app/console" element={me.user ? <Dashboard /> : <Navigate to="/" replace />} />
         <Route path="/architecture" element={<Explorer />} />
         <Route path="/paypal/return" element={<PayPalReturn />} />
         <Route path="*" element={<Navigate to="/" replace />} />
