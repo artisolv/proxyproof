@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, BadgeCheck, Bean, Bot, BotOff, CalendarCheck, CalendarDays, Check, CircleCheck, CircleDashed, CircleDollarSign, CloudOff, Coffee,
   ExternalLink, EyeOff, FastForward, FileDiff, FilePenLine, FileText, Ghost, Globe, Hotel, Hourglass, Landmark, LoaderCircle, OctagonPause,
-  Info, Package, Pause, X, Receipt, Repeat2, RotateCw, ShoppingCart, Shuffle, Store, TriangleAlert, UserRound, UserRoundCheck, UserRoundX, VenetianMask, Wallet, Wrench,
+  Info, Package, Pause, X, Receipt, Repeat2, RotateCw, ShoppingCart, Shuffle, SlidersHorizontal, Store, TriangleAlert, UserRound, UserRoundCheck, UserRoundX, VenetianMask, Wallet, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../api';
@@ -43,12 +43,34 @@ const STEP_MS = 1400;
 /** The rules each business sets for its agent. These become the agents' real signed mandates for the next run. */
 type Rules = { buyer: { max: number; reviewAbove: number; categories: string[]; suppliers: string[]; revoked: boolean }; seller: { mayInvoice: boolean; payTo: 'registered' | 'unregistered'; revoked: boolean } };
 const DEFAULT_RULES: Rules = { buyer: { max: 500, reviewAbove: 500, categories: ['coffee', 'service'], suppliers: ['Harbor & Pine Roasters'], revoked: false }, seller: { mayInvoice: true, payTo: 'registered', revoked: false } };
+/**
+ * Scenario presets. Rule-based ones change the agents' rules below (and the changed rows are marked); attack
+ * ones keep the default rules and run the attack. Editing any rule by hand switches to "Custom rules".
+ */
+type Preset = { id: string; title: string; icon: LucideIcon; comp: string; rules?: { buyer?: Partial<Rules['buyer']>; seller?: Partial<Rules['seller']> }; story?: string; real?: { text: string; source: string; url: string } };
+const PRESETS: Preset[] = [
+  { id: 'genuine', title: 'Everything genuine', icon: BadgeCheck, comp: 'genuine' },
+  { id: 'bank', title: 'Bank details changed', icon: Landmark, comp: 'genuine', rules: { seller: { payTo: 'unregistered' } } },
+  { id: 'over-limit', title: 'Over the limit', icon: CircleDollarSign, comp: 'genuine', rules: { buyer: { max: 200, reviewAbove: 200 } }, story: 'Northwind lowered its agent’s limit to $200, but the agent still tries to pay a bill above it.', real: { text: 'A shopping agent spent $31 on eggs without asking, and reported a lower total than it charged.', source: 'Washington Post via ADN', url: 'https://www.adn.com/alaska-life/2025/02/09/i-let-chatgpts-new-agent-manage-my-life-it-spent-31-on-a-dozen-eggs/' } },
+  { id: 'revoked', title: 'Agent revoked', icon: BotOff, comp: 'genuine', rules: { buyer: { revoked: true } }, story: 'Northwind switched its agent off after a key scare, but the agent still tries to pay.', real: { text: 'A former Cisco engineer used access that still worked five months after he resigned and deleted 456 servers.', source: 'US DOJ, NDCA', url: 'https://www.justice.gov/usao-ndca/pr/san-jose-man-sentenced-two-years-imprisonment-damaging-cisco-s-network' } },
+  { id: 'lookalike', title: 'Lookalike supplier', icon: Ghost, comp: 'lookalike-supplier' },
+  { id: 'injection', title: 'Prompt injection', icon: EyeOff, comp: 'prompt-injection' },
+  { id: 'altered', title: 'Invoice altered', icon: FilePenLine, comp: 'altered-in-transit' },
+  { id: 'mismatch', title: 'Price mismatch', icon: FileDiff, comp: 'different-totals' },
+  { id: 'forged', title: 'Forged authority', icon: VenetianMask, comp: 'forged-mandate' },
+  { id: 'duplicate', title: 'Duplicate payment', icon: Repeat2, comp: 'duplicate-payment' },
+  { id: 'offline', title: 'Status check offline', icon: CloudOff, comp: 'status-outage' },
+  { id: 'wrong-item', title: 'Wrong item', icon: Shuffle, comp: 'wrong-item' },
+];
+const PRESET = Object.fromEntries(PRESETS.map((p) => [p.id, p]));
+const withPreset = (p?: Preset): Rules => ({ buyer: { ...DEFAULT_RULES.buyer, ...(p?.rules?.buyer ?? {}) }, seller: { ...DEFAULT_RULES.seller, ...(p?.rules?.seller ?? {}) } });
+
 const CATS: [string, string][] = [['coffee', 'Coffee'], ['service', 'Machine service'], ['equipment', 'Equipment']];
 const SUPPLIERS: [string, string][] = [['Harbor & Pine Roasters', 'Harbor & Pine'], ['Bayside Trading Co.', 'Bayside Trading']];
 
 /** A rule row: label and live check state on the first line, the control under it. */
-function RuleRow({ label, st, children }: { label: string; st: St; children: ReactNode }) {
-  return <div className={`lb-rule s-${st}`}><div className="rh"><span>{label}</span><Glyph st={st} /></div><div className="rc">{children}</div></div>;
+function RuleRow({ label, st, children, changed }: { label: string; st: St; children: ReactNode; changed?: boolean }) {
+  return <div className={`lb-rule s-${st}${changed ? ' changed' : ''}`}><div className="rh"><span>{label}</span><Glyph st={st} /></div><div className="rc">{children}</div></div>;
 }
 function Toggle({ on, onClick, children, disabled }: { on: boolean; onClick: () => void; children: ReactNode; disabled?: boolean }) {
   return <button type="button" className="lb-tog" aria-pressed={on} onClick={onClick} disabled={disabled}>{children}</button>;
@@ -89,7 +111,9 @@ export function Lab() {
   const reduce = usePrefersReducedMotion();
   const [cat, setCat] = useState<any>(null);
   const [prompt, setPrompt] = useState('buy-coffee');
-  const [comp, setComp] = useState('genuine');
+  // The selected scenario preset; 'custom' once the user edits a rule by hand.
+  const [preset, setPreset] = useState('genuine');
+  const comp = preset === 'custom' ? 'genuine' : PRESET[preset].comp;
   const [run, setRun] = useState<any>(null);
   const [k, setK] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -100,8 +124,8 @@ export function Lab() {
   const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
   // The task the user actually ran. Nothing is highlighted until they click one.
   const [ran, setRan] = useState<string | null>(null);
-  const setB = (patch: Partial<Rules['buyer']>) => setRules((r) => ({ ...r, buyer: { ...r.buyer, ...patch } }));
-  const setS = (patch: Partial<Rules['seller']>) => setRules((r) => ({ ...r, seller: { ...r.seller, ...patch } }));
+  const setB = (patch: Partial<Rules['buyer']>) => { setPreset('custom'); setRules((r) => ({ ...r, buyer: { ...r.buyer, ...patch } })); };
+  const setS = (patch: Partial<Rules['seller']>) => { setPreset('custom'); setRules((r) => ({ ...r, seller: { ...r.seller, ...patch } })); };
   const flip = (xs: string[], x: string) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
   const rulesChanged = JSON.stringify(rules) !== JSON.stringify(DEFAULT_RULES);
   useEffect(() => { if (run && k >= run.steps.length && !busy) setWhy(true); }, [run, k, busy]);
@@ -123,12 +147,23 @@ export function Lab() {
     let n = from + 1; setK(n);
     timer.current = window.setInterval(() => { n += 1; if (n > r.steps.length) { stop(); return; } setK(n); }, STEP_MS);
   };
-  const start = async (p: string, c: string) => {
+  const start = async (p: string, c: string, r: Rules = rules) => {
     stop(); setWhy(false); setBusy(true); setError(null); setRun(null); setK(0);
-    try { const r = await api.post('/api/lab/runs', { prompt: p, complication: c, rules }); setRun(r); reveal(r, 0); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+    try { const res = await api.post('/api/lab/runs', { prompt: p, complication: c, rules: r }); setRun(res); reveal(res, 0); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
-  const pickPrompt = (id: string) => { setPrompt(id); setRan(id); const ok = cat.plans[`${id}:${comp}`]; const c = ok ? comp : 'genuine'; setComp(c); start(id, c); };
-  const pickComp = (id: string) => { if (!cat.plans[`${prompt}:${id}`]) return; setComp(id); if (run) start(prompt, id); else { setRun(null); setK(0); } };
+  const pickPrompt = (id: string) => {
+    setPrompt(id); setRan(id);
+    // A preset that does not apply to this task (e.g. "Wrong item" on a bill) falls back to everything genuine.
+    if (!cat.plans[`${id}:${comp}`]) { const r = withPreset(PRESET.genuine); setPreset('genuine'); setRules(r); start(id, 'genuine', r); return; }
+    start(id, comp);
+  };
+  const pickComp = (id: string) => {
+    const pr = PRESET[id];
+    if (!pr || !cat.plans[`${prompt}:${pr.comp}`]) return;
+    const r = withPreset(pr);
+    setPreset(id); setRules(r);
+    if (run) start(prompt, pr.comp, r); else { setRun(null); setK(0); }
+  };
   const approve = async () => {
     setWhy(false); setBusy(true); setError(null);
     try { const before = run.steps.length; const r = await api.post(`/api/lab/runs/${run.id}/approve`); setRun(r); reveal(r, before); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
@@ -213,16 +248,19 @@ export function Lab() {
       </div></header>
 
       <main className="lb-main">
-        <section className="lb-comps" aria-label="Today’s complication">
-          <span className="lb-label">Today’s complication</span>
+        <section className="lb-comps" aria-label="Scenario">
+          <span className="lb-label">Scenario <em>(sets the agents’ rules below, or runs an attack)</em></span>
           <div className="chips">
-            {cat.complications.map((c: any) => {
-              const I = COMP_ICON[c.id] ?? BadgeCheck;
-              const allowed = !!cat.plans[`${prompt}:${c.id}`];
-              return <button key={c.id} className={`lb-chip k-${c.kind}`} aria-pressed={c.id === comp} disabled={!allowed || busy} title={allowed ? c.story : 'Only applies to purchases'} onClick={() => pickComp(c.id)}><I aria-hidden="true" />{c.title}</button>;
+            {PRESETS.map((pr) => {
+              const I = pr.icon;
+              const allowed = !!cat.plans[`${prompt}:${pr.comp}`];
+              return <button key={pr.id} className="lb-chip" aria-pressed={pr.id === preset} disabled={!allowed || busy} title={allowed ? '' : 'Only applies to purchases'} onClick={() => pickComp(pr.id)}><I aria-hidden="true" />{pr.title}</button>;
             })}
+            <button className="lb-chip custom" aria-pressed={preset === 'custom'} disabled tabIndex={-1}><SlidersHorizontal aria-hidden="true" />Custom rules</button>
           </div>
-          {C && <p className="lb-realworld"><strong>{C.title}.</strong> {C.story} {C.real_world && <span className="src">Real world · {C.real_world.text} <a href={C.real_world.url} target="_blank" rel="noreferrer">{C.real_world.source}<ExternalLink aria-hidden="true" /></a></span>}</p>}
+          {preset === 'custom'
+            ? <p className="lb-realworld"><strong>Custom rules.</strong> You changed the agents’ rules by hand. Pick a task to see what ProxyProof decides.</p>
+            : (() => { const pr = PRESET[preset]; const story = pr.story ?? C?.story; const real = pr.real ?? C?.real_world; return <p className="lb-realworld"><strong>{pr.title}.</strong> {story} {real && <span className="src">Real world · {real.text} <a href={real.url} target="_blank" rel="noreferrer">{real.source}<ExternalLink aria-hidden="true" /></a></span>}</p>; })()}
         </section>
         {error && <p className="notice error" role="alert">{error}</p>}
 
@@ -235,22 +273,22 @@ export function Lab() {
               <span className={`lb-pill ${buyerCard?.state === 'REVOKED' ? 'held' : v.buyer.mandate === 'held' ? 'held' : 'ok'}`}>{buyerCard?.state === 'REVOKED' ? 'Revoked' : v.buyer.mandate === 'held' ? 'Mandate not genuine' : 'Authorized'}</span>
             </div>
             <div className="lb-rules">
-              <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => setRules(DEFAULT_RULES)} disabled={busy}>Reset</button>}</div>
-              <RuleRow label="Pays on its own up to" st={v.review}>
+              <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => { setRules(DEFAULT_RULES); setPreset('genuine'); }} disabled={busy}>Reset</button>}</div>
+              <RuleRow label="Pays on its own up to" st={v.review} changed={rules.buyer.reviewAbove !== DEFAULT_RULES.buyer.reviewAbove}>
                 <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.reviewAbove} disabled={busy} onChange={(e) => setB({ reviewAbove: Math.max(0, Number(e.target.value) || 0) })} aria-label="The agent pays on its own up to this amount, in dollars" /></span>
                 <span className="lb-hint">above this, a Northwind manager must approve</span>
               </RuleRow>
-              <RuleRow label="With a manager’s approval, up to" st={v.buyer.scope}>
+              <RuleRow label="With a manager’s approval, up to" st={v.buyer.scope} changed={rules.buyer.max !== DEFAULT_RULES.buyer.max}>
                 <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.max} disabled={busy} onChange={(e) => setB({ max: Math.max(0, Number(e.target.value) || 0) })} aria-label="Hard limit per payment, even with approval, in dollars" /></span>
                 <span className="lb-hint">never more than this</span>
               </RuleRow>
-              <RuleRow label="May buy" st={v.buyer.scope}>
+              <RuleRow label="May buy" st={v.buyer.scope} changed={rules.buyer.categories.join() !== DEFAULT_RULES.buyer.categories.join()}>
                 {CATS.map(([k, l]) => <Toggle key={k} on={rules.buyer.categories.includes(k)} disabled={busy} onClick={() => setB({ categories: flip(rules.buyer.categories, k) })}>{l}</Toggle>)}
               </RuleRow>
-              <RuleRow label="Approved suppliers" st={v.buyer.cp}>
+              <RuleRow label="Approved suppliers" st={v.buyer.cp} changed={rules.buyer.suppliers.join() !== DEFAULT_RULES.buyer.suppliers.join()}>
                 {SUPPLIERS.map(([k, l]) => <Toggle key={k} on={rules.buyer.suppliers.includes(k)} disabled={busy} onClick={() => setB({ suppliers: flip(rules.buyer.suppliers, k) })}>{l}</Toggle>)}
               </RuleRow>
-              <RuleRow label="Agent status" st={v.buyer.mandate}>
+              <RuleRow label="Agent status" st={v.buyer.mandate} changed={rules.buyer.revoked}>
                 <Toggle on={!rules.buyer.revoked} disabled={busy} onClick={() => setB({ revoked: false })}>Active</Toggle>
                 <Toggle on={rules.buyer.revoked} disabled={busy} onClick={() => setB({ revoked: true })}>Revoked</Toggle>
               </RuleRow>
@@ -340,15 +378,15 @@ export function Lab() {
             </div>
             <div className="lb-rules">
               <div className="lb-rules-h"><span className="lb-label">Rules Harbor & Pine sets for its agent</span></div>
-              <RuleRow label="May send" st={v.seller.scope}>
+              <RuleRow label="May send" st={v.seller.scope} changed={!rules.seller.mayInvoice}>
                 <Toggle on={!rules.seller.mayInvoice} disabled={busy} onClick={() => setS({ mayInvoice: false })}>Quotes only</Toggle>
                 <Toggle on={rules.seller.mayInvoice} disabled={busy} onClick={() => setS({ mayInvoice: true })}>Quotes & invoices</Toggle>
               </RuleRow>
-              <RuleRow label="Invoice asks to be paid into" st={v.seller.payout}>
+              <RuleRow label="Invoice asks to be paid into" st={v.seller.payout} changed={rules.seller.payTo !== 'registered'}>
                 <Toggle on={rules.seller.payTo === 'registered'} disabled={busy} onClick={() => setS({ payTo: 'registered' })}>Registered PayPal</Toggle>
                 <Toggle on={rules.seller.payTo === 'unregistered'} disabled={busy} onClick={() => setS({ payTo: 'unregistered' })}>A new account</Toggle>
               </RuleRow>
-              <RuleRow label="Agent status" st={v.seller.mandate}>
+              <RuleRow label="Agent status" st={v.seller.mandate} changed={rules.seller.revoked}>
                 <Toggle on={!rules.seller.revoked} disabled={busy} onClick={() => setS({ revoked: false })}>Active</Toggle>
                 <Toggle on={rules.seller.revoked} disabled={busy} onClick={() => setS({ revoked: true })}>Revoked</Toggle>
               </RuleRow>
