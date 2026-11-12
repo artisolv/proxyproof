@@ -112,8 +112,8 @@ export function Lab() {
   const [cat, setCat] = useState<any>(null);
   const [prompt, setPrompt] = useState('buy-coffee');
   // The selected scenario preset; 'custom' once the user edits a rule by hand.
-  const [preset, setPreset] = useState('genuine');
-  const comp = preset === 'custom' ? 'genuine' : PRESET[preset].comp;
+  const [preset, setPreset] = useState<string | null>(null);
+  const comp = preset && preset !== 'custom' ? PRESET[preset].comp : 'genuine';
   const [run, setRun] = useState<any>(null);
   const [k, setK] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -124,15 +124,8 @@ export function Lab() {
   const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
   // The task the user actually ran. Nothing is highlighted until they click one.
   const [ran, setRan] = useState<string | null>(null);
-  // A manual edit selects the rule-based preset these rules now match (attack presets keep default rules, so they
-  // only match "Everything genuine"), or "Custom rules" when none does.
-  const norm = (r: Rules) => JSON.stringify({ ...r, buyer: { ...r.buyer, categories: [...r.buyer.categories].sort(), suppliers: [...r.buyer.suppliers].sort() } });
-  const same = (a: Rules, b: Rules) => norm(a) === norm(b);
-  const follow = (next: Rules) => {
-    const hit = PRESETS.find((pr) => (pr.comp === 'genuine') && same(withPreset(pr), next));
-    setPreset(hit ? hit.id : 'custom');
-    setRules(next);
-  };
+  // Any manual edit to a rule activates "Custom".
+  const follow = (next: Rules) => { setPreset('custom'); setRules(next); };
   const setB = (patch: Partial<Rules['buyer']>) => follow({ ...rules, buyer: { ...rules.buyer, ...patch } });
   const setS = (patch: Partial<Rules['seller']>) => follow({ ...rules, seller: { ...rules.seller, ...patch } });
   const flip = (xs: string[], x: string) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
@@ -163,7 +156,7 @@ export function Lab() {
   const pickPrompt = (id: string) => {
     setPrompt(id); setRan(id);
     // A preset that does not apply to this task (e.g. "Wrong item" on a bill) falls back to everything genuine.
-    if (!cat.plans[`${id}:${comp}`]) { const r = withPreset(PRESET.genuine); setPreset('genuine'); setRules(r); start(id, 'genuine', r); return; }
+    if (!cat.plans[`${id}:${comp}`]) { const r = withPreset(); setPreset(null); setRules(r); start(id, 'genuine', r); return; }
     start(id, comp);
   };
   const pickComp = (id: string) => {
@@ -258,17 +251,19 @@ export function Lab() {
 
       <main className="lb-main">
         <section className="lb-comps" aria-label="Scenario">
-          <span className="lb-label">Scenario <em>(sets the agents’ rules below, or runs an attack)</em></span>
+          <span className="lb-label">Scenario <em>(optional: sets the agents’ rules below, or runs an attack)</em></span>
           <div className="chips">
-            {PRESETS.map((pr) => {
+            <button className="lb-chip" aria-pressed={preset === 'custom'} disabled={busy} onClick={() => setPreset('custom')}><SlidersHorizontal aria-hidden="true" />Custom</button>
+            {PRESETS.filter((pr) => pr.id !== 'genuine').map((pr) => {
               const I = pr.icon;
               const allowed = !!cat.plans[`${prompt}:${pr.comp}`];
               return <button key={pr.id} className="lb-chip" aria-pressed={pr.id === preset} disabled={!allowed || busy} title={allowed ? '' : 'Only applies to purchases'} onClick={() => pickComp(pr.id)}><I aria-hidden="true" />{pr.title}</button>;
             })}
-            <button className="lb-chip custom" aria-pressed={preset === 'custom'} disabled tabIndex={-1}><SlidersHorizontal aria-hidden="true" />Custom rules</button>
           </div>
-          {preset === 'custom'
-            ? <p className="lb-realworld"><strong>Custom rules.</strong> You changed the agents’ rules by hand. Pick a task to see what ProxyProof decides.</p>
+          {!preset
+            ? <p className="lb-realworld"><strong>Pick a scenario</strong> to set up a real-world problem, or change the agents’ rules yourself. Then tell the buyer’s agent what to do.</p>
+            : preset === 'custom'
+            ? <p className="lb-realworld"><strong>Custom.</strong> You set the agents’ rules yourself. Pick a task to see what ProxyProof decides.</p>
             : (() => { const pr = PRESET[preset]; const story = pr.story ?? C?.story; const real = pr.real ?? C?.real_world; return <p className="lb-realworld"><strong>{pr.title}.</strong> {story} {real && <span className="src">Real world · {real.text} <a href={real.url} target="_blank" rel="noreferrer">{real.source}<ExternalLink aria-hidden="true" /></a></span>}</p>; })()}
         </section>
         {error && <p className="notice error" role="alert">{error}</p>}
@@ -282,7 +277,7 @@ export function Lab() {
               <span className={`lb-pill ${buyerCard?.state === 'REVOKED' ? 'held' : v.buyer.mandate === 'held' ? 'held' : 'ok'}`}>{buyerCard?.state === 'REVOKED' ? 'Revoked' : v.buyer.mandate === 'held' ? 'Mandate not genuine' : 'Authorized'}</span>
             </div>
             <div className="lb-rules">
-              <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => { setRules(DEFAULT_RULES); setPreset('genuine'); }} disabled={busy}>Reset</button>}</div>
+              <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => { setRules(DEFAULT_RULES); setPreset(null); }} disabled={busy}>Reset</button>}</div>
               <RuleRow label="Pays on its own up to" st={v.review}>
                 <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.reviewAbove} disabled={busy} onChange={(e) => setB({ reviewAbove: Math.max(0, Number(e.target.value) || 0) })} aria-label="The agent pays on its own up to this amount, in dollars" /></span>
                 <span className="lb-hint">above this, a Northwind manager must approve</span>

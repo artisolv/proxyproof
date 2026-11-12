@@ -376,5 +376,3 @@
 .lb-pp .money { font-size: 13.5px; }
 @media (max-width: 759px) { .ref { grid-template-columns: 1fr; } .ref-col + .ref-col { border-left: 0; border-top: 1.5px solid #17171b; } }
 
-.lb-chip.custom:disabled { opacity: 1; cursor: default; border-style: dashed; color: #8a8a93; }
-.lb-chip.custom[aria-pressed='true'] { background: #17171b; color: #fff; border-style: solid; box-shadow: 0 4px 0 #ff7a59; }
