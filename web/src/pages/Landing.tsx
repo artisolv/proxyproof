@@ -6,6 +6,7 @@ import { Monogram, Wordmark } from '../Monogram';
 import { useMe } from '../main';
 import { usePrefersReducedMotion } from '../ui';
 import '../landing.css';
+import { Hero } from './Hero';
 
 /*
  * Landing page. Light paper, black ink, thin outlined cards with a hard drop shadow, one accent per card.
@@ -133,21 +134,11 @@ export function Landing() {
         <button className="pp-btn outline sm" onClick={open} disabled={busy}>{me.user ? 'Open the lab' : 'Try the demo'}</button>
       </header>
 
-      <main>
-        <section className="pp-hero" aria-labelledby="pp-h1">
-          <h1 id="pp-h1">Payments between AI agents, proven on both sides</h1>
-          <div className="pp-hero-side">
-            <p>When one company’s agent pays another’s, ProxyProof checks that each agent really acts for its business, may make this payment, and agreed to the same terms. Then PayPal moves the money.</p>
-            <div className="pp-cta">
-              <button className="pp-btn dark" onClick={open} disabled={busy}>{busy ? 'Opening…' : 'Open the live demo'}</button>
-              <a className="pp-arrow-link" href="#how"><span className="pp-dot"><ArrowRight /></span>How it works</a>
-            </div>
-            {error && <p className="pp-error" role="alert">{error}</p>}
-          </div>
-        </section>
+      <Hero onDemo={open} busy={busy} />
 
-        <div className="pp-grid">
-          <LiveCheck />
+      <main>
+        {error && <p className="pp-error" role="alert">{error}</p>}
+        <div className="pp-grid two">
           <section className="pp-card pp-accent" aria-labelledby="pay-h">
             <div className="pp-card-h"><h2 id="pay-h">Pay a supplier’s agent</h2><span className="pp-round dark" aria-hidden="true"><ArrowUpRight /></span></div>
             <p>Your agent pays an invoice. ProxyProof confirms the seller’s agent may collect, into the account the business enrolled.</p>

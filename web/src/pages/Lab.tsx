@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, BadgeCheck, Bean, Bot, BotOff, CalendarCheck, CalendarDays, Check, CircleCheck, CircleDashed, CircleDollarSign, CloudOff, Coffee,
   ExternalLink, EyeOff, FastForward, FileDiff, FilePenLine, FileText, Ghost, Globe, Hotel, Hourglass, Landmark, LoaderCircle, OctagonPause,
-  Package, Pause, Receipt, Repeat2, RotateCw, ShoppingCart, Shuffle, Store, TriangleAlert, UserRound, UserRoundCheck, UserRoundX, VenetianMask, Wallet, Wrench,
+  Info, Package, Pause, X, Receipt, Repeat2, RotateCw, ShoppingCart, Shuffle, Store, TriangleAlert, UserRound, UserRoundCheck, UserRoundX, VenetianMask, Wallet, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../api';
@@ -82,6 +82,15 @@ export function Lab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
+  // The "why" popup opens once a run has fully played out (allowed, held, or waiting for a person).
+  const [why, setWhy] = useState(false);
+  useEffect(() => { if (run && k >= run.steps.length && !busy) setWhy(true); }, [run, k, busy]);
+  useEffect(() => {
+    if (!why) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setWhy(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [why]);
 
   useEffect(() => { api.get('/api/lab/scenarios').then(setCat).catch((e) => setError(e.message)); }, []);
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
@@ -95,13 +104,13 @@ export function Lab() {
     timer.current = window.setInterval(() => { n += 1; if (n > r.steps.length) { stop(); return; } setK(n); }, STEP_MS);
   };
   const start = async (p: string, c: string) => {
-    stop(); setBusy(true); setError(null); setRun(null); setK(0);
+    stop(); setWhy(false); setBusy(true); setError(null); setRun(null); setK(0);
     try { const r = await api.post('/api/lab/runs', { prompt: p, complication: c }); setRun(r); reveal(r, 0); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
   const pickPrompt = (id: string) => { setPrompt(id); const ok = cat.plans[`${id}:${comp}`]; const c = ok ? comp : 'genuine'; setComp(c); start(id, c); };
   const pickComp = (id: string) => { if (!cat.plans[`${prompt}:${id}`]) return; setComp(id); if (run) start(prompt, id); else { setRun(null); setK(0); } };
   const approve = async () => {
-    setBusy(true); setError(null);
+    setWhy(false); setBusy(true); setError(null);
     try { const before = run.steps.length; const r = await api.post(`/api/lab/runs/${run.id}/approve`); setRun(r); reveal(r, before); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
   const capture = async () => { setBusy(true); try { setRun({ ...(await api.post(`/api/lab/runs/${run.id}/capture`)) }); } catch (e: any) { setError(e.message); } finally { setBusy(false); } };
@@ -243,6 +252,7 @@ export function Lab() {
                 <span className="name"><Monogram size={22} title="" />ProxyProof</span>
                 <span className="pill">{phase === 'idle' ? 'Ready' : phase === 'running' ? <><LoaderCircle className="spin" aria-hidden="true" />Checking…</> : phase === 'review' ? 'Waiting for approval' : phase === 'held' ? 'Held' : 'Allowed'}</span>
                 {revealing && <button className="icon-btn" onClick={() => { stop(); setK(run.steps.length); }} title="Skip to result"><FastForward aria-hidden="true" /><span className="sr-only">Skip to result</span></button>}
+                {settled && <button className="why-btn" onClick={() => setWhy(true)}><Info aria-hidden="true" />Why?</button>}
                 {settled && !run.awaiting && <button className="icon-btn" onClick={() => start(prompt, comp)} disabled={busy} title="Run again"><RotateCw aria-hidden="true" /><span className="sr-only">Run again</span></button>}
               </div>
               {phase === 'running' && <div className="progress" aria-hidden="true" />}
@@ -307,6 +317,41 @@ export function Lab() {
         </div>
 
       </main>
+
+      {why && settled && (() => {
+        const st = phase === 'held' ? 'held' : phase === 'review' ? 'review' : 'allowed';
+        const Icon = st === 'held' ? OctagonPause : st === 'review' ? Hourglass : CircleCheck;
+        const code = finalCode ?? (st === 'review' ? 'REVIEW_REQUIRED' : null);
+        const allowedWhy = [
+          'Both agents proved who they are with their own signatures.',
+          'Northwind and Harbor & Pine each genuinely approved their agent, and neither approval has expired or been revoked.',
+          'The amount is within the buyer’s limit, the supplier is approved, and the money goes to the account the seller registered.',
+          'Both agents signed exactly the same terms.',
+        ];
+        return (
+          <div className="why-back" onMouseDown={(e) => { if (e.target === e.currentTarget) setWhy(false); }}>
+            <div className={`why why-${st}`} role="dialog" aria-modal="true" aria-labelledby="why-h">
+              <button className="why-x" onClick={() => setWhy(false)} aria-label="Close"><X /></button>
+              <div className="why-top">
+                <span className="why-icon"><Icon aria-hidden="true" /></span>
+                <div>
+                  <span className="why-kicker">{st === 'held' ? 'Payment held' : st === 'review' ? 'Waiting for approval' : out?.cleared_after ? 'Payment allowed after a pause' : 'Payment allowed'}</span>
+                  <h2 id="why-h">{st === 'held' ? `Stopped because ${WHY[finalCode] ?? WHY[stopCode] ?? 'a check did not pass'}.` : st === 'review' ? `This bill is above Northwind’s $250 approval line, so a person must approve the exact terms.` : 'Both sides are proven, so the payment can go ahead.'}</h2>
+                </div>
+              </div>
+              <div className="why-body">
+                {st === 'allowed' && <ul className="why-list">{allowedWhy.map((t) => <li key={t}><Check aria-hidden="true" />{t}</li>)}</ul>}
+                {st === 'held' && <p><strong>What ProxyProof found:</strong> {out?.caught_at?.result}</p>}
+                {st === 'review' && <p>{run.awaiting.approver} approves with Northwind’s own key. Until then, no permit is issued and no money can move.</p>}
+                {code && <p className="why-code">Reason code <code>{code}</code></p>}
+                <p className="why-next"><strong>{st === 'held' ? 'Money:' : 'Next:'}</strong> {st === 'held' ? (tx?.payment_state === 'AWAITING_BUYER_APPROVAL' ? 'only the first checkout exists; the repeat never reached PayPal.' : 'no money moved and no PayPal order was created.') : st === 'review' ? 'press “Approve these terms” on the ProxyProof card.' : 'the buyer approves the checkout on PayPal; it counts as paid only when PayPal confirms.'}</p>
+                {C?.real_world && <p className="why-real"><strong>Real world:</strong> {C.real_world.text} <a href={C.real_world.url} target="_blank" rel="noreferrer">{C.real_world.source}</a></p>}
+                {C && st !== 'review' && <p className="why-real"><strong>Without ProxyProof:</strong> {C.without}</p>}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
