@@ -161,10 +161,14 @@ export function Lab() {
   };
   const pickComp = (id: string) => {
     const pr = PRESET[id];
-    if (!pr || !cat.plans[`${prompt}:${pr.comp}`]) return;
+    if (!pr) return;
+    // A scenario that only fits some tasks (e.g. "Wrong item" needs a purchase) switches to the first task it fits.
+    const task = cat.plans[`${prompt}:${pr.comp}`] ? prompt : cat.prompts.find((x: any) => cat.plans[`${x.id}:${pr.comp}`])?.id;
+    if (!task) return;
     const r = withPreset(pr);
     setPreset(id); setRules(r);
-    if (run) start(prompt, pr.comp, r); else { setRun(null); setK(0); }
+    if (task !== prompt) setPrompt(task);
+    if (run) { setRan(task); start(task, pr.comp, r); } else { setRun(null); setK(0); }
   };
   const approve = async () => {
     setWhy(false); setBusy(true); setError(null);
@@ -256,8 +260,8 @@ export function Lab() {
             <button className="lb-chip" aria-pressed={preset === 'custom'} disabled={busy} onClick={() => setPreset('custom')}><SlidersHorizontal aria-hidden="true" />Custom</button>
             {PRESETS.filter((pr) => pr.id !== 'genuine').map((pr) => {
               const I = pr.icon;
-              const allowed = !!cat.plans[`${prompt}:${pr.comp}`];
-              return <button key={pr.id} className="lb-chip" aria-pressed={pr.id === preset} disabled={!allowed || busy} title={allowed ? '' : 'Only applies to purchases'} onClick={() => pickComp(pr.id)}><I aria-hidden="true" />{pr.title}</button>;
+              const fits = !!cat.plans[`${prompt}:${pr.comp}`];
+              return <button key={pr.id} className="lb-chip" aria-pressed={pr.id === preset} disabled={busy} title={fits ? '' : 'Switches to the coffee order'} onClick={() => pickComp(pr.id)}><I aria-hidden="true" />{pr.title}</button>;
             })}
           </div>
           {!preset
