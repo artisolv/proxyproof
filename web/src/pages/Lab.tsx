@@ -42,7 +42,7 @@ const WHY: Record<string, string> = {
 const STEP_MS = 1400;
 /** The rules each business sets for its agent. These become the agents' real signed mandates for the next run. */
 type Rules = { buyer: { max: number; reviewAbove: number; categories: string[]; suppliers: string[]; revoked: boolean }; seller: { mayInvoice: boolean; payTo: 'registered' | 'unregistered'; revoked: boolean } };
-const DEFAULT_RULES: Rules = { buyer: { max: 500, reviewAbove: 250, categories: ['coffee', 'service'], suppliers: ['Harbor & Pine Roasters'], revoked: false }, seller: { mayInvoice: true, payTo: 'registered', revoked: false } };
+const DEFAULT_RULES: Rules = { buyer: { max: 500, reviewAbove: 500, categories: ['coffee', 'service'], suppliers: ['Harbor & Pine Roasters'], revoked: false }, seller: { mayInvoice: true, payTo: 'registered', revoked: false } };
 const CATS: [string, string][] = [['coffee', 'Coffee'], ['service', 'Machine service'], ['equipment', 'Equipment']];
 const SUPPLIERS: [string, string][] = [['Harbor & Pine Roasters', 'Harbor & Pine'], ['Bayside Trading Co.', 'Bayside Trading']];
 
@@ -76,7 +76,7 @@ function Banner({ p }: { p: any }) {
         <span className="eyebrow">{p.document === 'QUOTE' ? 'Quote' : 'Invoice'} {p.reference} · Harbor & Pine Roasters</span>
         <strong className="title">{p.title}</strong>
         <span className="line">{p.lines.map((l: any) => `${l.quantity} × ${l.name}`).join(', ')}</span>
-        <span className="price">{usd(p.total)}{p.kind === 'bill' && <em>above $250: manager approves</em>}</span>
+        <span className="price">{usd(p.total)}</span>
       </div>
       <div className="art" aria-hidden="true">{art}</div>
     </div>
@@ -190,7 +190,7 @@ export function Lab() {
         : phase === 'held' ? `Stopped at step ${out.caught_at.step}. ${out.caught_at.result}`
           : out?.cleared_after ? `Paused at step ${out.cleared_after.step}; once resolved, both agents were proven again on live state.` : 'Both agents proven and signed the same terms. Single-use permit issued.';
   const money = tx?.payment_state === 'COMPLETED' ? `PayPal confirmed · ${usd(tx.amount)} paid`
-    : tx?.payment_state === 'AWAITING_BUYER_APPROVAL' ? (finalCode === 'PERMIT_ALREADY_USED' ? 'Checkout opened once · the retry never reached PayPal' : `Checkout open on PayPal · waiting for the buyer to approve ${usd(tx.amount)}`)
+    : tx?.payment_state === 'AWAITING_BUYER_APPROVAL' ? (finalCode === 'PERMIT_ALREADY_USED' ? 'One PayPal checkout created · the repeat never reached PayPal' : `${usd(tx.amount)} sent through PayPal (sandbox) · Northwind’s agent → ${sellerName.replace(' Sales Agent', '')}’s agent`)
       : 'No money has moved.';
 
   // The bridge in the banner: each agent's signature over the terms, meeting at ProxyProof.
@@ -300,24 +300,32 @@ export function Lab() {
                     <button className="btn-approve" onClick={approve} disabled={busy}>{busy ? 'Approving…' : `Approve these terms as ${run.awaiting.approver.split(',')[0]}`}</button>
                   </div>
                 )}
-                <div className="pills">
-                  <span className="grp a-buyer">Buyer’s agent</span>
-                  <Pill st={v.buyer.id}>Identity</Pill><Pill st={v.buyer.org}>Enrolled</Pill><Pill st={v.buyer.mandate}>Mandate</Pill><Pill st={v.buyer.limits}>Limits</Pill>
-                  <span className="grp a-seller">Seller’s agent</span>
-                  <Pill st={v.seller.id}>Identity</Pill><Pill st={v.seller.org}>Enrolled</Pill><Pill st={v.seller.mandate}>Mandate</Pill><Pill st={v.seller.payout}>Payout</Pill>
-                  <span className="grp a-pp">Both</span>
-                  <Pill st={v.both.terms}>Same terms</Pill><Pill st={v.review}>{!v.m('review') && v.review === 'pass' ? 'No approval needed' : 'Approval'}</Pill><Pill st={v.both.permit}>Permit</Pill><Pill st={v.both.paypal}>PayPal</Pill>
+                <div className="ref" aria-label="ProxyProof's checks">
+                  <div className="ref-col a-buyer">
+                    <span className="ref-h">Buyer’s agent</span>
+                    <Check2 st={v.buyer.id}>Identity</Check2>
+                    <Check2 st={v.buyer.org}>Business enrolled</Check2>
+                    <Check2 st={v.buyer.mandate}>Mandate genuine</Check2>
+                    <Check2 st={v.buyer.limits}>Within its rules</Check2>
+                  </div>
+                  <div className="ref-col ref-mid">
+                    <span className="ref-h"><Monogram size={16} title="" />Both</span>
+                    <Check2 st={v.both.terms}>Same terms signed</Check2>
+                    <Check2 st={v.m('review') ? v.review : v.both.permit === 'pass' ? 'pass' : v.review === 'pass' ? 'pass' : 'idle'}>{v.m('review') ? 'Approval rule met' : 'Rules agree'}</Check2>
+                    <Check2 st={v.both.permit}>One-time permit</Check2>
+                    <Check2 st={v.both.paypal}>PayPal checkout</Check2>
+                  </div>
+                  <div className="ref-col a-seller">
+                    <span className="ref-h">Seller’s agent</span>
+                    <Check2 st={v.seller.id}>Identity</Check2>
+                    <Check2 st={v.seller.org}>Business enrolled</Check2>
+                    <Check2 st={v.seller.mandate}>Mandate genuine</Check2>
+                    <Check2 st={v.seller.payout}>Payout account</Check2>
+                  </div>
                 </div>
               </div>
               <div className="money">
                 <Wallet aria-hidden="true" /><span>{money}</span>
-                {settled && tx?.payment_state === 'AWAITING_BUYER_APPROVAL' && tx.payment?.payer_link && finalCode !== 'PERMIT_ALREADY_USED' && (
-                  <span className="pay-actions">
-                    <a className="btn-paypal" href={tx.payment.payer_link} target="_blank" rel="noreferrer">Approve as buyer on PayPal<ExternalLink aria-hidden="true" /></a>
-                    <button className="btn-ghost" onClick={capture} disabled={busy}>Capture after approval</button>
-                    <button className="icon-btn dark" onClick={sync} disabled={busy} title="Refresh PayPal status"><RotateCw aria-hidden="true" /><span className="sr-only">Refresh PayPal status</span></button>
-                  </span>
-                )}
               </div>
               {settled && !run.awaiting && C && <p className="without"><strong>Without ProxyProof:</strong> {C.without}</p>}
             </section>
@@ -389,7 +397,7 @@ export function Lab() {
                 {st === 'held' && <p><strong>What ProxyProof found:</strong> {out?.caught_at?.result}</p>}
                 {st === 'review' && <p>{run.awaiting.approver} approves with Northwind’s own key. Until then, no permit is issued and no money can move.</p>}
                 {code && <p className="why-code">Reason code <code>{code}</code></p>}
-                <p className="why-next"><strong>{st === 'held' ? 'Money:' : 'Next:'}</strong> {st === 'held' ? (tx?.payment_state === 'AWAITING_BUYER_APPROVAL' ? 'only the first checkout exists; the repeat never reached PayPal.' : 'no money moved and no PayPal order was created.') : st === 'review' ? 'press “Approve these terms” on the ProxyProof card.' : 'the buyer approves the checkout on PayPal; it counts as paid only when PayPal confirms.'}</p>
+                <p className="why-next"><strong>{st === 'held' ? 'Money:' : 'Next:'}</strong> {st === 'held' ? (tx?.payment_state === 'AWAITING_BUYER_APPROVAL' ? 'only the first checkout exists; the repeat never reached PayPal.' : 'no money moved and no PayPal order was created.') : st === 'review' ? 'press “Approve these terms” on the ProxyProof card.' : 'the buyer’s agent spent its one-time permit and PayPal created the checkout for exactly these terms. The permit cannot be used again.'}</p>
                 {C?.real_world && <p className="why-real"><strong>Real world:</strong> {C.real_world.text} <a href={C.real_world.url} target="_blank" rel="noreferrer">{C.real_world.source}</a></p>}
                 {C && st !== 'review' && <p className="why-real"><strong>Without ProxyProof:</strong> {C.without}</p>}
               </div>
@@ -401,6 +409,9 @@ export function Lab() {
   );
 }
 
+function Check2({ st, children }: { st: St; children: ReactNode }) {
+  return <span className={`ref-row s-${st}`}><Glyph st={st} /><span>{children}</span>{st === 'held' && <em>flag</em>}</span>;
+}
 function Pill({ st, children }: { st: St; children: ReactNode }) {
   return <span className={`lb-check s-${st}`}><Glyph st={st} />{children}</span>;
 }
