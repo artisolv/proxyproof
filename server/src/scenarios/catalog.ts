@@ -112,8 +112,18 @@ export const COMPLICATIONS: Complication[] = [
     apply: (b) => { b.offer.lines = [['Espresso Roast, 5 lb', 3]]; b.offer.say = 'Harbor & Pine’s agent quotes what Northwind’s agent asked for: 3 × Espresso Roast, $210.'; } },
 ];
 
-/** Builds the steps for one prompt and one complication. */
-export function compose(promptId: string, complicationId: string): Scenario | null {
+/**
+ * Rules the user sets for each agent in the lab, as each business would. The engine turns them into the agents'
+ * real signed mandates; ProxyProof's checks then decide. Missing fields keep the defaults in WORLD.
+ */
+export type Rules = {
+  buyer?: { max?: number; reviewAbove?: number; categories?: string[]; suppliers?: string[]; revoked?: boolean };
+  seller?: { mayInvoice?: boolean; payTo?: 'registered' | 'unregistered'; revoked?: boolean };
+};
+export const UNREGISTERED_ACCOUNT = 'billing@harb0r-pine.example';
+
+/** Builds the steps for one prompt and one complication, under the user's rules. */
+export function compose(promptId: string, complicationId: string, rules: Rules = {}): Scenario | null {
   const p = PROMPTS.find((x) => x.id === promptId), c = COMPLICATIONS.find((x) => x.id === complicationId);
   if (!p || !c || (c.appliesTo && !c.appliesTo.includes(p.kind))) return null;
   const verb = p.kind === 'purchase' ? 'quotes' : 'invoices';
@@ -124,6 +134,10 @@ export function compose(promptId: string, complicationId: string): Scenario | nu
     before: [], afterAccept: [], afterPay: [],
   };
   c.apply(b, p);
+  // The user's rules: a revoked agent is revoked before it acts; the seller's payout choice goes on the invoice.
+  if (rules.seller?.payTo === 'unregistered' && b.seller === SELLER) { b.offer.payTo = UNREGISTERED_ACCOUNT; }
+  if (rules.buyer?.revoked) b.before.push({ do: 'revoke', agent: BUYER, reason: 'Northwind revoked this agent', say: 'Northwind has revoked its agent’s mandate.' });
+  if (rules.seller?.revoked && b.seller === SELLER) b.before.push({ do: 'revoke', agent: SELLER, reason: 'Harbor & Pine revoked this agent', say: 'Harbor & Pine has revoked its agent’s delegation.' });
   const steps: Step[] = [
     ...b.before, b.offer, b.accept,
     { do: 'approve_if_asked', approver: APPROVER, say: 'A Northwind manager approves the exact terms.' },

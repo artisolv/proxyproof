@@ -62,6 +62,28 @@ describe('scenario engine', () => {
     });
   }
 
+  // Rules the user sets for each agent become real signed mandates; the same request then passes or is held.
+  const RULES: [string, any, string | null][] = [
+    ['limit below the order', { buyer: { max: 200 } }, 'AMOUNT_EXCEEDS_LIMIT'],
+    ['coffee not allowed', { buyer: { categories: ['service'] } }, 'CATEGORY_NOT_PERMITTED'],
+    ['Harbor & Pine not an approved supplier', { buyer: { suppliers: ['Bayside Trading Co.'] } }, 'COUNTERPARTY_NOT_APPROVED'],
+    ['buyer agent revoked', { buyer: { revoked: true } }, 'DELEGATION_REVOKED'],
+    ['seller may only quote', { seller: { mayInvoice: false } }, null],
+    ['seller asks to be paid into an unregistered account', { seller: { payTo: 'unregistered' } }, 'DESTINATION_NOT_AUTHORIZED'],
+    ['seller agent revoked', { seller: { revoked: true } }, 'DELEGATION_REVOKED'],
+    ['generous rules', { buyer: { max: 1000, reviewAbove: 900 } }, null],
+  ];
+  for (const [name, rules, code] of RULES) {
+    it(`rules: ${name}`, async () => {
+      const t = await live();
+      // The coffee order is a quote, so "may only quote" still passes; the service invoice must not.
+      const prompt = name === 'seller may only quote' ? 'pay-service' : 'buy-coffee';
+      const r = (await t.post('/api/lab/runs', { prompt, complication: 'genuine', rules })).json;
+      const expected = name === 'seller may only quote' ? 'ACTION_NOT_PERMITTED' : code;
+      expect(r.outcome.stops[0]?.code ?? null).toBe(expected);
+    });
+  }
+
   it('refuses combinations that do not apply', async () => {
     const t = await setup();
     expect((await t.post('/api/lab/runs', { prompt: 'pay-bill', complication: 'wrong-item' })).status).toBe(404);

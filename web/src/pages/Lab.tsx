@@ -40,6 +40,19 @@ const WHY: Record<string, string> = {
   STATUS_UNAVAILABLE: 'the revocation status could not be checked', ACTION_NOT_PERMITTED: 'the agent may not do this', SIGNATURE_INVALID: 'the signature does not verify',
 };
 const STEP_MS = 1400;
+/** The rules each business sets for its agent. These become the agents' real signed mandates for the next run. */
+type Rules = { buyer: { max: number; reviewAbove: number; categories: string[]; suppliers: string[]; revoked: boolean }; seller: { mayInvoice: boolean; payTo: 'registered' | 'unregistered'; revoked: boolean } };
+const DEFAULT_RULES: Rules = { buyer: { max: 500, reviewAbove: 250, categories: ['coffee', 'service'], suppliers: ['Harbor & Pine Roasters'], revoked: false }, seller: { mayInvoice: true, payTo: 'registered', revoked: false } };
+const CATS: [string, string][] = [['coffee', 'Coffee'], ['service', 'Machine service'], ['equipment', 'Equipment']];
+const SUPPLIERS: [string, string][] = [['Harbor & Pine Roasters', 'Harbor & Pine'], ['Bayside Trading Co.', 'Bayside Trading']];
+
+/** A rule row: label and live check state on the first line, the control under it. */
+function RuleRow({ label, st, children }: { label: string; st: St; children: ReactNode }) {
+  return <div className={`lb-rule s-${st}`}><div className="rh"><span>{label}</span><Glyph st={st} /></div><div className="rc">{children}</div></div>;
+}
+function Toggle({ on, onClick, children, disabled }: { on: boolean; onClick: () => void; children: ReactNode; disabled?: boolean }) {
+  return <button type="button" className="lb-tog" aria-pressed={on} onClick={onClick} disabled={disabled}>{children}</button>;
+}
 /** The server formats money as “USD 238.00”; on screen it reads “$238.00”. */
 const usd = (x?: string | null) => (x ? x.replace(/^USD\s?/, '$') : '');
 
@@ -84,6 +97,11 @@ export function Lab() {
   const timer = useRef<number | null>(null);
   // The "why" popup opens once a run has fully played out (allowed, held, or waiting for a person).
   const [why, setWhy] = useState(false);
+  const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
+  const setB = (patch: Partial<Rules['buyer']>) => setRules((r) => ({ ...r, buyer: { ...r.buyer, ...patch } }));
+  const setS = (patch: Partial<Rules['seller']>) => setRules((r) => ({ ...r, seller: { ...r.seller, ...patch } }));
+  const flip = (xs: string[], x: string) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
+  const rulesChanged = JSON.stringify(rules) !== JSON.stringify(DEFAULT_RULES);
   useEffect(() => { if (run && k >= run.steps.length && !busy) setWhy(true); }, [run, k, busy]);
   useEffect(() => {
     if (!why) return;
@@ -105,7 +123,7 @@ export function Lab() {
   };
   const start = async (p: string, c: string) => {
     stop(); setWhy(false); setBusy(true); setError(null); setRun(null); setK(0);
-    try { const r = await api.post('/api/lab/runs', { prompt: p, complication: c }); setRun(r); reveal(r, 0); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+    try { const r = await api.post('/api/lab/runs', { prompt: p, complication: c, rules }); setRun(r); reveal(r, 0); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
   const pickPrompt = (id: string) => { setPrompt(id); const ok = cat.plans[`${id}:${comp}`]; const c = ok ? comp : 'genuine'; setComp(c); start(id, c); };
   const pickComp = (id: string) => { if (!cat.plans[`${prompt}:${id}`]) return; setComp(id); if (run) start(prompt, id); else { setRun(null); setK(0); } };
@@ -214,13 +232,26 @@ export function Lab() {
               <div><strong>{buyerCard?.name ?? 'Northwind Procurement Agent'}</strong><span>acts for Northwind Hotels</span></div>
               <span className={`lb-pill ${buyerCard?.state === 'REVOKED' ? 'held' : v.buyer.mandate === 'held' ? 'held' : 'ok'}`}>{buyerCard?.state === 'REVOKED' ? 'Revoked' : v.buyer.mandate === 'held' ? 'Mandate not genuine' : 'Authorized'}</span>
             </div>
-            <ul className="lb-facts">
-              <Fact icon={ShoppingCart} st={v.buyer.scope}>Coffee & machine service</Fact>
-              <Fact icon={CircleDollarSign} st={v.buyer.scope}>Up to $500 per payment</Fact>
-              <Fact icon={Store} st={v.buyer.cp}>Harbor & Pine only</Fact>
-              <Fact icon={UserRoundCheck} st={v.review}>Manager approves above $250</Fact>
-            </ul>
-            <span className="lb-label">Tell the agent to…</span>
+            <div className="lb-rules">
+              <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => setRules(DEFAULT_RULES)} disabled={busy}>Reset</button>}</div>
+              <RuleRow label="Spending limit per payment" st={v.buyer.scope}>
+                <span className="lb-money-in">$<input type="number" min={0} step={50} value={rules.buyer.max} disabled={busy} onChange={(e) => setB({ max: Math.max(0, Number(e.target.value) || 0) })} aria-label="Spending limit in dollars" /></span>
+              </RuleRow>
+              <RuleRow label="Manager approves above" st={v.review}>
+                <span className="lb-money-in">$<input type="number" min={0} step={50} value={rules.buyer.reviewAbove} disabled={busy} onChange={(e) => setB({ reviewAbove: Math.max(0, Number(e.target.value) || 0) })} aria-label="Approval threshold in dollars" /></span>
+              </RuleRow>
+              <RuleRow label="May buy" st={v.buyer.scope}>
+                {CATS.map(([k, l]) => <Toggle key={k} on={rules.buyer.categories.includes(k)} disabled={busy} onClick={() => setB({ categories: flip(rules.buyer.categories, k) })}>{l}</Toggle>)}
+              </RuleRow>
+              <RuleRow label="Approved suppliers" st={v.buyer.cp}>
+                {SUPPLIERS.map(([k, l]) => <Toggle key={k} on={rules.buyer.suppliers.includes(k)} disabled={busy} onClick={() => setB({ suppliers: flip(rules.buyer.suppliers, k) })}>{l}</Toggle>)}
+              </RuleRow>
+              <RuleRow label="Agent status" st={v.buyer.mandate}>
+                <Toggle on={!rules.buyer.revoked} disabled={busy} onClick={() => setB({ revoked: false })}>Active</Toggle>
+                <Toggle on={rules.buyer.revoked} disabled={busy} onClick={() => setB({ revoked: true })}>Revoked</Toggle>
+              </RuleRow>
+            </div>
+            <span className="lb-label">Tell the agent to… <em>(runs with the rules above)</em></span>
             <div className="lb-prompts">
               {cat.prompts.map((p: any) => {
                 const I = PROMPT_ICON[p.kind];
@@ -295,12 +326,22 @@ export function Lab() {
               <div><strong>{sellerName}</strong><span>acts for {sellerOrg}</span></div>
               <span className={`lb-pill ${sellerCard?.organization.status === 'UNVERIFIED' || comp === 'lookalike-supplier' ? 'held' : 'ok'}`}>{sellerCard?.organization.status === 'UNVERIFIED' || (comp === 'lookalike-supplier' && !sellerCard) ? 'Not enrolled' : 'Authorized'}</span>
             </div>
-            <ul className="lb-facts">
-              <Fact icon={FileText} st={v.seller.scope}>Quote & invoice</Fact>
-              <Fact icon={CircleDollarSign} st={v.seller.scope}>Up to $2,000</Fact>
-              <Fact icon={Hotel} st={v.seller.cp}>Customer: Northwind Hotels</Fact>
-              <Fact icon={Wallet} st={v.seller.payout}>Paid only to its enrolled PayPal</Fact>
-            </ul>
+            <div className="lb-rules">
+              <div className="lb-rules-h"><span className="lb-label">Rules Harbor & Pine sets for its agent</span></div>
+              <RuleRow label="May send" st={v.seller.scope}>
+                <Toggle on={!rules.seller.mayInvoice} disabled={busy} onClick={() => setS({ mayInvoice: false })}>Quotes only</Toggle>
+                <Toggle on={rules.seller.mayInvoice} disabled={busy} onClick={() => setS({ mayInvoice: true })}>Quotes & invoices</Toggle>
+              </RuleRow>
+              <RuleRow label="Invoice asks to be paid into" st={v.seller.payout}>
+                <Toggle on={rules.seller.payTo === 'registered'} disabled={busy} onClick={() => setS({ payTo: 'registered' })}>Registered PayPal</Toggle>
+                <Toggle on={rules.seller.payTo === 'unregistered'} disabled={busy} onClick={() => setS({ payTo: 'unregistered' })}>A new account</Toggle>
+              </RuleRow>
+              <RuleRow label="Agent status" st={v.seller.mandate}>
+                <Toggle on={!rules.seller.revoked} disabled={busy} onClick={() => setS({ revoked: false })}>Active</Toggle>
+                <Toggle on={rules.seller.revoked} disabled={busy} onClick={() => setS({ revoked: true })}>Revoked</Toggle>
+              </RuleRow>
+              <p className="lb-rule-note">Fixed by the business: invoices up to $2,000, customer Northwind Hotels.</p>
+            </div>
             <div className="lb-invoice">
               <span className="lb-label">{terms?.document === 'QUOTE' ? 'Quote it sends' : 'Invoice it sends'}</span>
               {terms ? (

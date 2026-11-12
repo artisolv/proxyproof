@@ -6,7 +6,7 @@ import { approveReview, recheck, transactionView } from '../trust/bilateral.js';
 import { captureCheckout, syncPayment, type ExecutorCtx } from '../executor/gate.js';
 import type { Behaviour } from '../runtime/testAgent.js';
 import { TestRuntimeDriver, type AgentDriver, type Api, type DriverEnv } from './drivers.js';
-import { COMPLICATIONS, compose, PRODUCTS, PROMPTS, WORLD, type Scenario, type Step } from './catalog.js';
+import { COMPLICATIONS, compose, PRODUCTS, PROMPTS, WORLD, type Rules, type Scenario, type Step } from './catalog.js';
 
 /**
  * The scenario engine. Each run builds a fresh, isolated world (two businesses, their agents and delegations, made with
@@ -22,7 +22,7 @@ export type LabCtx = { db: DB; publicUrl: string; api: Api; executor: ExecutorCt
 const days = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString();
 
 /** Builds the scenario world in its own workspace. Returns name → id maps for organizations and agents. */
-async function buildWorld(ctx: LabCtx) {
+async function buildWorld(ctx: LabCtx, rules: Rules = {}) {
   const { db } = ctx;
   const { ws, user } = createWorkspace(db, 'ProxyProof scenario run', 'Scenario operator');
   const me = { id: user, name: 'Scenario operator' };
@@ -36,7 +36,17 @@ async function buildWorld(ctx: LabCtx) {
     const { id } = await registerAgent(db, ws, { name: a.name, side: a.side, principalId: orgs[a.org], provider: 'ProxyProof test agent' }, { type: 'SYSTEM' });
     agents[a.name] = id;
     if (!a.mandate) continue;
-    const m = a.mandate;
+    // The user's rules replace the defaults for the two main agents.
+    const r = a.name === 'Northwind Procurement Agent' ? rules.buyer : undefined;
+    const sr = a.name === 'Harbor & Pine Sales Agent' ? rules.seller : undefined;
+    const m = {
+      ...a.mandate,
+      ...(r?.max != null ? { max_minor: Math.round(r.max * 100) } : {}),
+      ...(r?.reviewAbove != null ? { review_above_minor: Math.round(r.reviewAbove * 100) } : {}),
+      ...(r?.categories ? { categories: r.categories } : {}),
+      ...(r?.suppliers ? { counterparties: r.suppliers } : {}),
+      ...(sr?.mayInvoice === false ? { actions: ['quote'] } : {}),
+    };
     const mandate = {
       actions: m.actions, max_amount_minor: m.max_minor, currencies: ['USD'], categories: m.categories,
       counterparties: (m.counterparties ?? []).map(did),
@@ -80,13 +90,13 @@ type StepRec = {
 
 type StepRecord = StepRec;
 /** Everything needed to continue a run that is waiting for a person's approval. Kept server-side, never returned. */
-type RunState = { prompt: string; complication: string; world: { ws: string; user: string; orgs: Record<string, string>; agents: Record<string, string> }; txId: string | null; permit?: string; spent?: string; next: number };
+type RunState = { prompt: string; complication: string; rules?: Rules; world: { ws: string; user: string; orgs: Record<string, string>; agents: Record<string, string> }; txId: string | null; permit?: string; spent?: string; next: number };
 
 /** Runs one request × complication in a fresh world and stores the run. It stops early if a person must approve. */
-export async function runScenario(ctx: LabCtx, ownerWorkspace: string, promptId: string, complicationId: string, opts: { pause?: boolean } = {}) {
-  if (!compose(promptId, complicationId)) throw new NotFound('That combination of request and complication does not exist.');
-  const world = await buildWorld(ctx);
-  return play(ctx, ownerWorkspace, null, { prompt: promptId, complication: complicationId, world, txId: null, next: 0 }, [], { pause: opts.pause ?? false, approve: false });
+export async function runScenario(ctx: LabCtx, ownerWorkspace: string, promptId: string, complicationId: string, opts: { pause?: boolean; rules?: Rules } = {}) {
+  if (!compose(promptId, complicationId, opts.rules)) throw new NotFound('That combination of request and complication does not exist.');
+  const world = await buildWorld(ctx, opts.rules);
+  return play(ctx, ownerWorkspace, null, { prompt: promptId, complication: complicationId, rules: opts.rules, world, txId: null, next: 0 }, [], { pause: opts.pause ?? false, approve: false });
 }
 
 /** The presenter approves as the buyer organization's manager: the engine performs the signed approval and continues. */
@@ -99,7 +109,7 @@ export async function approveRun(ctx: LabCtx, ownerWorkspace: string, runId: str
 }
 
 async function play(ctx: LabCtx, ownerWorkspace: string, runId: string | null, st: RunState, steps: StepRecord[], opts: { pause: boolean; approve: boolean }) {
-  const sc = compose(st.prompt, st.complication)!;
+  const sc = compose(st.prompt, st.complication, st.rules)!;
   const { db } = ctx;
   const world = st.world;
   const env: DriverEnv = { db, api: ctx.api, workspaceId: world.ws, publicUrl: ctx.publicUrl };

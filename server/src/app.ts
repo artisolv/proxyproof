@@ -275,8 +275,16 @@ export function createApp(deps: AppDeps) {
   app.post('/api/lab/runs', auth, async (c) => {
     const s = c.get('session');
     if (!limit(`lab:${s.workspaceId}`, 120, 3_600_000)) throw new Forbidden('Too many scenario runs. Try again later.');
-    const b = z.object({ prompt: z.string().max(40), complication: z.string().max(40) }).parse(await c.req.json());
-    return c.json(await runScenario(lab, s.workspaceId, b.prompt, b.complication, { pause: true }), 201);
+    const Org = z.enum(['Harbor & Pine Roasters', 'Bayside Trading Co.']);
+    const Cat = z.enum(['coffee', 'service', 'equipment']);
+    const b = z.object({
+      prompt: z.string().max(40), complication: z.string().max(40),
+      rules: z.object({
+        buyer: z.object({ max: z.number().min(0).max(100_000).optional(), reviewAbove: z.number().min(0).max(100_000).optional(), categories: z.array(Cat).max(3).optional(), suppliers: z.array(Org).max(2).optional(), revoked: z.boolean().optional() }).optional(),
+        seller: z.object({ mayInvoice: z.boolean().optional(), payTo: z.enum(['registered', 'unregistered']).optional(), revoked: z.boolean().optional() }).optional(),
+      }).optional(),
+    }).parse(await c.req.json());
+    return c.json(await runScenario(lab, s.workspaceId, b.prompt, b.complication, { pause: true, rules: b.rules }), 201);
   });
   app.get('/api/lab/runs/:id', auth, async (c) => c.json(await getRun(lab, c.get('session').workspaceId, c.req.param('id'), { sync: c.req.query('sync') === '1' })));
   app.post('/api/lab/runs/:id/approve', auth, async (c) => c.json(await approveRun(lab, c.get('session').workspaceId, c.req.param('id'))));
