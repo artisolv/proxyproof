@@ -271,3 +271,18 @@
 .lb-card.ring-buyer, .lb-card.ring-person, .lb-card.ring-seller { box-shadow: 0 5px 0 var(--ink), 0 0 0 4px var(--held-t); }
 .lb-node::before { height: 4px; top: 17px; }
 .btn-approve, .btn-paypal { border: var(--edge); }
+
+/* Buyer and seller cards share one height, so the two sides look balanced; the footer sits at the bottom. */
+.lb-cols { align-items: stretch; }
+.lb-side { display: flex; flex-direction: column; gap: 12px; }
+.lb-side > .lb-foot { margin-top: auto; }
+
+/* Complications: one full-width grid of large, square-cornered options. */
+/* Six per row; a shorter last row stretches so the options always span the full width. */
+.lb-comps .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.lb-comps .chips .lb-chip { flex: 1 1 calc((100% - 40px) / 6); min-width: 0; }
+.lb-chip { height: auto; min-height: 52px; padding: 10px 14px; border-radius: 0; font-size: 14.5px; justify-content: flex-start; text-align: left; line-height: 1.25; gap: 10px; }
+.lb-chip svg { width: 20px; height: 20px; }
+.lb-chip[aria-pressed='true'] { box-shadow: 0 4px 0 #ff7a59; }
+@media (max-width: 1099px) { .lb-comps .chips .lb-chip { flex-basis: calc((100% - 16px) / 3); } }
+@media (max-width: 759px) { .lb-comps .chips { flex-wrap: wrap; overflow: visible; } .lb-comps .chips .lb-chip { flex-basis: calc((100% - 8px) / 2); font-size: 13.5px; min-height: 48px; } }

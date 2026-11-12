@@ -170,10 +170,6 @@ export function Lab() {
   const termsBad = ['fail'].includes(v.m('seller_terms')?.state) || ['fail'].includes(v.m('buyer_terms')?.state);
   const termsOk = v.m('buyer_terms')?.state === 'pass';
 
-  // Steps on the rail: what happened so far, then what is still planned.
-  const done: any[] = run ? run.steps.slice(0, k) : [];
-  const ghosts: any[] = run ? (revealing ? run.steps.slice(k) : []) : plan;
-  const railFill = phase === 'held' ? 'held' : phase === 'review' ? 'review' : 'pass';
 
   return (
     <div className="lb">
@@ -310,16 +306,6 @@ export function Lab() {
           </section>
         </div>
 
-        <section className={`lb-rail fill-${railFill}`} aria-label="Steps">
-          <ol>
-            {done.map((s: any, i: number) => {
-              const st: St = s.ok ? 'pass' : s.tx?.decision === 'REVIEW' ? 'review' : 'held';
-              return <RailNode key={`d${i}`} n={i + 1} actor={s.actor} doing={s.do} say={s.say} result={s.result} code={s.ok ? null : s.code} st={st} now={revealing && i === k - 1} />;
-            })}
-            {run?.awaiting && !revealing && <RailNode n={done.length + 1} actor="BUYER_ORG" doing="review" say={run.awaiting.say} result="Waiting for your click above." st="review" now />}
-            {ghosts.map((s: any, i: number) => <RailNode key={`g${i}`} n={done.length + i + 1} actor={s.actor} doing={s.do} say={s.say} ghost />)}
-          </ol>
-        </section>
       </main>
     </div>
   );
@@ -327,17 +313,4 @@ export function Lab() {
 
 function Pill({ st, children }: { st: St; children: ReactNode }) {
   return <span className={`lb-check s-${st}`}><Glyph st={st} />{children}</span>;
-}
-
-function RailNode({ n, actor, doing, say, result, code, st, ghost, now }: { n: number; actor: string; doing: string; say: string; result?: string; code?: string | null; st?: St; ghost?: boolean; now?: boolean }) {
-  const a = ACTOR[actor] ?? ACTOR.WORLD;
-  const I = actor === 'EXECUTOR' ? Wallet : actor === 'WORLD' ? Globe : actor === 'BUYER_ORG' || actor === 'SELLER_ORG' ? (doing === 'revoke' ? UserRoundX : UserRoundCheck) : actor === 'PROXYPROOF' ? null : Bot;
-  return (
-    <li className={`lb-node ${a.cls}${ghost ? ' ghost' : ''}${now ? ' now' : ''}${st ? ` s-${st}` : ''}`}>
-      <span className="dot">{I ? <I aria-hidden="true" /> : <Monogram size={20} title="" />}{st && !ghost && <span className="badge">{st === 'pass' ? <Check /> : st === 'review' ? <Hourglass /> : <Pause />}</span>}</span>
-      <span className="who">{n}. {a.label}</span>
-      <span className="say">{say}</span>
-      {result && <span className="res">{result}{code && <code>{code}</code>}</span>}
-    </li>
-  );
 }
