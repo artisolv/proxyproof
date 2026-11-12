@@ -2,6 +2,8 @@
 
 **Verify both sides before AI agents transact.**
 
+**Live demo:** https://proxyproof.artisolv.com · open **Explore Live Demo** for the scenario lab.
+
 > Is this AI agent authorized to **MAKE** / **COLLECT** payment?
 
 ProxyProof verifies both sides of agentic commerce:
