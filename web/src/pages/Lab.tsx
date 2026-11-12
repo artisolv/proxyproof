@@ -42,7 +42,7 @@ const WHY: Record<string, string> = {
 const STEP_MS = 1400;
 /** The rules each business sets for its agent. These become the agents' real signed mandates for the next run. */
 type Rules = { buyer: { max: number; reviewAbove: number; categories: string[]; suppliers: string[]; revoked: boolean }; seller: { mayInvoice: boolean; payTo: 'registered' | 'unregistered'; revoked: boolean } };
-const DEFAULT_RULES: Rules = { buyer: { max: 500, reviewAbove: 500, categories: ['coffee', 'service'], suppliers: ['Harbor & Pine Roasters'], revoked: false }, seller: { mayInvoice: true, payTo: 'registered', revoked: false } };
+const DEFAULT_RULES: Rules = { buyer: { max: 500, reviewAbove: 250, categories: ['coffee', 'service'], suppliers: ['Harbor & Pine Roasters'], revoked: false }, seller: { mayInvoice: true, payTo: 'registered', revoked: false } };
 /**
  * Scenario presets. Rule-based ones change the agents' rules below (and the changed rows are marked); attack
  * ones keep the default rules and run the attack. Editing any rule by hand switches to "Custom rules".
@@ -69,8 +69,8 @@ const CATS: [string, string][] = [['coffee', 'Coffee'], ['service', 'Machine ser
 const SUPPLIERS: [string, string][] = [['Harbor & Pine Roasters', 'Harbor & Pine'], ['Bayside Trading Co.', 'Bayside Trading']];
 
 /** A rule row: label and live check state on the first line, the control under it. */
-function RuleRow({ label, st, children, changed }: { label: string; st: St; children: ReactNode; changed?: boolean }) {
-  return <div className={`lb-rule s-${st}${changed ? ' changed' : ''}`}><div className="rh"><span>{label}</span><Glyph st={st} /></div><div className="rc">{children}</div></div>;
+function RuleRow({ label, st, children }: { label: string; st: St; children: ReactNode }) {
+  return <div className={`lb-rule s-${st}`}><div className="rh"><span>{label}</span><Glyph st={st} /></div><div className="rc">{children}</div></div>;
 }
 function Toggle({ on, onClick, children, disabled }: { on: boolean; onClick: () => void; children: ReactNode; disabled?: boolean }) {
   return <button type="button" className="lb-tog" aria-pressed={on} onClick={onClick} disabled={disabled}>{children}</button>;
@@ -124,8 +124,17 @@ export function Lab() {
   const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
   // The task the user actually ran. Nothing is highlighted until they click one.
   const [ran, setRan] = useState<string | null>(null);
-  const setB = (patch: Partial<Rules['buyer']>) => { setPreset('custom'); setRules((r) => ({ ...r, buyer: { ...r.buyer, ...patch } })); };
-  const setS = (patch: Partial<Rules['seller']>) => { setPreset('custom'); setRules((r) => ({ ...r, seller: { ...r.seller, ...patch } })); };
+  // A manual edit selects the rule-based preset these rules now match (attack presets keep default rules, so they
+  // only match "Everything genuine"), or "Custom rules" when none does.
+  const norm = (r: Rules) => JSON.stringify({ ...r, buyer: { ...r.buyer, categories: [...r.buyer.categories].sort(), suppliers: [...r.buyer.suppliers].sort() } });
+  const same = (a: Rules, b: Rules) => norm(a) === norm(b);
+  const follow = (next: Rules) => {
+    const hit = PRESETS.find((pr) => (pr.comp === 'genuine') && same(withPreset(pr), next));
+    setPreset(hit ? hit.id : 'custom');
+    setRules(next);
+  };
+  const setB = (patch: Partial<Rules['buyer']>) => follow({ ...rules, buyer: { ...rules.buyer, ...patch } });
+  const setS = (patch: Partial<Rules['seller']>) => follow({ ...rules, seller: { ...rules.seller, ...patch } });
   const flip = (xs: string[], x: string) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
   const rulesChanged = JSON.stringify(rules) !== JSON.stringify(DEFAULT_RULES);
   useEffect(() => { if (run && k >= run.steps.length && !busy) setWhy(true); }, [run, k, busy]);
@@ -274,21 +283,21 @@ export function Lab() {
             </div>
             <div className="lb-rules">
               <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => { setRules(DEFAULT_RULES); setPreset('genuine'); }} disabled={busy}>Reset</button>}</div>
-              <RuleRow label="Pays on its own up to" st={v.review} changed={rules.buyer.reviewAbove !== DEFAULT_RULES.buyer.reviewAbove}>
+              <RuleRow label="Pays on its own up to" st={v.review}>
                 <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.reviewAbove} disabled={busy} onChange={(e) => setB({ reviewAbove: Math.max(0, Number(e.target.value) || 0) })} aria-label="The agent pays on its own up to this amount, in dollars" /></span>
                 <span className="lb-hint">above this, a Northwind manager must approve</span>
               </RuleRow>
-              <RuleRow label="With a manager’s approval, up to" st={v.buyer.scope} changed={rules.buyer.max !== DEFAULT_RULES.buyer.max}>
+              <RuleRow label="With a manager’s approval, up to" st={v.buyer.scope}>
                 <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.max} disabled={busy} onChange={(e) => setB({ max: Math.max(0, Number(e.target.value) || 0) })} aria-label="Hard limit per payment, even with approval, in dollars" /></span>
                 <span className="lb-hint">never more than this</span>
               </RuleRow>
-              <RuleRow label="May buy" st={v.buyer.scope} changed={rules.buyer.categories.join() !== DEFAULT_RULES.buyer.categories.join()}>
+              <RuleRow label="May buy" st={v.buyer.scope}>
                 {CATS.map(([k, l]) => <Toggle key={k} on={rules.buyer.categories.includes(k)} disabled={busy} onClick={() => setB({ categories: flip(rules.buyer.categories, k) })}>{l}</Toggle>)}
               </RuleRow>
-              <RuleRow label="Approved suppliers" st={v.buyer.cp} changed={rules.buyer.suppliers.join() !== DEFAULT_RULES.buyer.suppliers.join()}>
+              <RuleRow label="Approved suppliers" st={v.buyer.cp}>
                 {SUPPLIERS.map(([k, l]) => <Toggle key={k} on={rules.buyer.suppliers.includes(k)} disabled={busy} onClick={() => setB({ suppliers: flip(rules.buyer.suppliers, k) })}>{l}</Toggle>)}
               </RuleRow>
-              <RuleRow label="Agent status" st={v.buyer.mandate} changed={rules.buyer.revoked}>
+              <RuleRow label="Agent status" st={v.buyer.mandate}>
                 <Toggle on={!rules.buyer.revoked} disabled={busy} onClick={() => setB({ revoked: false })}>Active</Toggle>
                 <Toggle on={rules.buyer.revoked} disabled={busy} onClick={() => setB({ revoked: true })}>Revoked</Toggle>
               </RuleRow>
@@ -378,15 +387,15 @@ export function Lab() {
             </div>
             <div className="lb-rules">
               <div className="lb-rules-h"><span className="lb-label">Rules Harbor & Pine sets for its agent</span></div>
-              <RuleRow label="May send" st={v.seller.scope} changed={!rules.seller.mayInvoice}>
+              <RuleRow label="May send" st={v.seller.scope}>
                 <Toggle on={!rules.seller.mayInvoice} disabled={busy} onClick={() => setS({ mayInvoice: false })}>Quotes only</Toggle>
                 <Toggle on={rules.seller.mayInvoice} disabled={busy} onClick={() => setS({ mayInvoice: true })}>Quotes & invoices</Toggle>
               </RuleRow>
-              <RuleRow label="Invoice asks to be paid into" st={v.seller.payout} changed={rules.seller.payTo !== 'registered'}>
+              <RuleRow label="Invoice asks to be paid into" st={v.seller.payout}>
                 <Toggle on={rules.seller.payTo === 'registered'} disabled={busy} onClick={() => setS({ payTo: 'registered' })}>Registered PayPal</Toggle>
                 <Toggle on={rules.seller.payTo === 'unregistered'} disabled={busy} onClick={() => setS({ payTo: 'unregistered' })}>A new account</Toggle>
               </RuleRow>
-              <RuleRow label="Agent status" st={v.seller.mandate} changed={rules.seller.revoked}>
+              <RuleRow label="Agent status" st={v.seller.mandate}>
                 <Toggle on={!rules.seller.revoked} disabled={busy} onClick={() => setS({ revoked: false })}>Active</Toggle>
                 <Toggle on={rules.seller.revoked} disabled={busy} onClick={() => setS({ revoked: true })}>Revoked</Toggle>
               </RuleRow>
