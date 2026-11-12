@@ -286,3 +286,20 @@
 .lb-chip[aria-pressed='true'] { box-shadow: 0 4px 0 #ff7a59; }
 @media (max-width: 1099px) { .lb-comps .chips .lb-chip { flex-basis: calc((100% - 16px) / 3); } }
 @media (max-width: 759px) { .lb-comps .chips { flex-wrap: wrap; overflow: visible; } .lb-comps .chips .lb-chip { flex-basis: calc((100% - 8px) / 2); font-size: 13.5px; min-height: 48px; } }
+
+/* Agent card headings: a full-width colour band in the agent's own colour. */
+.lb-side .lb-who { margin: -16px -16px 4px; padding: 14px 16px; border-bottom: 1.5px solid var(--ink); border-radius: 18px 18px 0 0; color: #fff; }
+.lb-side[aria-label^='Buyer'] .lb-who { background: var(--buyer); }
+.lb-side[aria-label^='Seller'] .lb-who { background: var(--seller); }
+.lb-side .lb-who strong { color: #fff; }
+.lb-side .lb-who span:not(.lb-pill):not(.lb-avatar) { color: rgba(255,255,255,.85); }
+.lb-side .lb-who .lb-avatar { background: #fff; border: 1.5px solid var(--ink); }
+.lb-side[aria-label^='Buyer'] .lb-who .lb-avatar { color: var(--buyer); }
+.lb-side[aria-label^='Seller'] .lb-who .lb-avatar { color: var(--seller); }
+.lb-side .lb-who .lb-pill { background: #fff; border: 1.5px solid var(--ink); }
+.lb-side .lb-who .lb-pill.ok { color: var(--pass); }
+.lb-side .lb-who .lb-pill.held { color: var(--held-ink); background: var(--held-t); }
+
+/* Options: one line each, equal height. */
+.lb-chip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 50px; justify-content: center; }
+.lb-side .lb-who { min-height: 84px; }
