@@ -240,3 +240,34 @@
   .lb-node:first-child::before { top: 19px; }
   .lb-node:last-child::before { bottom: auto; height: 19px; }
 }
+
+/* ---------- Light, outlined product look (shared with the landing page) ----------
+ * Paper background, black ink outlines with a hard bottom shadow, coral for anything held.
+ * Actor colours stay on the step rail and the small labels only. */
+.lb { --bg: #f4f4f1; --line: #17171b; --ink: #17171b; --held: #ff7a59; --held-t: #ffe7df; --held-ink: #8a2f12; --edge: 1.5px solid #17171b; --hard: 0 5px 0 #17171b; }
+.lb-top { background: var(--bg); color: var(--ink); border-bottom: var(--edge); }
+.lb-brand { color: var(--ink); }
+.lb-title, .lb-link { color: var(--ink-2); }
+.lb-link:hover { color: var(--ink); }
+.lb-sep { background: rgba(23,23,27,.2); }
+.lb-card, .lb-carousel, .lb-rail { border: var(--edge); box-shadow: var(--hard); border-radius: 20px; }
+.lb-pp { border: var(--edge) !important; box-shadow: var(--hard); border-radius: 20px; background: #fff; }
+.lb-pp.ph-idle .band { background: var(--ink); }
+.lb-pp.ph-allowed, .lb-pp.ph-running { background: #e3f5ec; }
+.lb-pp.ph-held { background: var(--held-t); }
+.lb-pp.ph-held .band { background: var(--held); color: var(--ink); }
+.lb-pp .money { border-top: var(--edge); }
+.lb-chip { border: var(--edge); height: 34px; }
+.lb-chip[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); }
+.lb-prompt { border: var(--edge); border-radius: 14px; }
+.lb-prompt:hover:not(:disabled) { border-color: var(--ink); background: #fafaf8; }
+.lb-prompt[aria-pressed='true'] { background: var(--held-t); border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.lb-prompt svg { color: var(--ink); }
+.lb-invoice { background: var(--bg); border: 1px solid rgba(23,23,27,.15); }
+.lb-avatar { border: var(--edge); }
+.lb-banner .art { background: var(--bg); border: var(--edge); }
+.lb-check { border: 1px solid rgba(23,23,27,.12); }
+.lb-check.s-held { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.lb-card.ring-buyer, .lb-card.ring-person, .lb-card.ring-seller { box-shadow: 0 5px 0 var(--ink), 0 0 0 4px var(--held-t); }
+.lb-node::before { height: 4px; top: 17px; }
+.btn-approve, .btn-paypal { border: var(--edge); }

@@ -178,7 +178,7 @@ export function Lab() {
   return (
     <div className="lb">
       <header className="lb-top"><div className="lb-top-inner">
-        <Link className="lb-brand" to="/" aria-label="ProxyProof home"><Wordmark size={30} /></Link>
+        <Link className="lb-brand" to="/" aria-label="ProxyProof home"><Wordmark size={30} ring /></Link>
         <span className="lb-sep" aria-hidden="true" />
         <span className="lb-title">Scenario lab</span>
         <span className="spacer" />
