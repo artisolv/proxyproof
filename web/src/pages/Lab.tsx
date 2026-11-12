@@ -98,6 +98,8 @@ export function Lab() {
   // The "why" popup opens once a run has fully played out (allowed, held, or waiting for a person).
   const [why, setWhy] = useState(false);
   const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
+  // The task the user actually ran. Nothing is highlighted until they click one.
+  const [ran, setRan] = useState<string | null>(null);
   const setB = (patch: Partial<Rules['buyer']>) => setRules((r) => ({ ...r, buyer: { ...r.buyer, ...patch } }));
   const setS = (patch: Partial<Rules['seller']>) => setRules((r) => ({ ...r, seller: { ...r.seller, ...patch } }));
   const flip = (xs: string[], x: string) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
@@ -125,7 +127,7 @@ export function Lab() {
     stop(); setWhy(false); setBusy(true); setError(null); setRun(null); setK(0);
     try { const r = await api.post('/api/lab/runs', { prompt: p, complication: c, rules }); setRun(r); reveal(r, 0); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
-  const pickPrompt = (id: string) => { setPrompt(id); const ok = cat.plans[`${id}:${comp}`]; const c = ok ? comp : 'genuine'; setComp(c); start(id, c); };
+  const pickPrompt = (id: string) => { setPrompt(id); setRan(id); const ok = cat.plans[`${id}:${comp}`]; const c = ok ? comp : 'genuine'; setComp(c); start(id, c); };
   const pickComp = (id: string) => { if (!cat.plans[`${prompt}:${id}`]) return; setComp(id); if (run) start(prompt, id); else { setRun(null); setK(0); } };
   const approve = async () => {
     setWhy(false); setBusy(true); setError(null);
@@ -234,11 +236,13 @@ export function Lab() {
             </div>
             <div className="lb-rules">
               <div className="lb-rules-h"><span className="lb-label">Rules Northwind sets for its agent</span>{rulesChanged && <button className="lb-reset" onClick={() => setRules(DEFAULT_RULES)} disabled={busy}>Reset</button>}</div>
-              <RuleRow label="Spending limit per payment" st={v.buyer.scope}>
-                <span className="lb-money-in">$<input type="number" min={0} step={50} value={rules.buyer.max} disabled={busy} onChange={(e) => setB({ max: Math.max(0, Number(e.target.value) || 0) })} aria-label="Spending limit in dollars" /></span>
+              <RuleRow label="Pays on its own up to" st={v.review}>
+                <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.reviewAbove} disabled={busy} onChange={(e) => setB({ reviewAbove: Math.max(0, Number(e.target.value) || 0) })} aria-label="The agent pays on its own up to this amount, in dollars" /></span>
+                <span className="lb-hint">above this, a Northwind manager must approve</span>
               </RuleRow>
-              <RuleRow label="Manager approves above" st={v.review}>
-                <span className="lb-money-in">$<input type="number" min={0} step={50} value={rules.buyer.reviewAbove} disabled={busy} onChange={(e) => setB({ reviewAbove: Math.max(0, Number(e.target.value) || 0) })} aria-label="Approval threshold in dollars" /></span>
+              <RuleRow label="With a manager’s approval, up to" st={v.buyer.scope}>
+                <span className="lb-money-in">$<input type="number" inputMode="numeric" min={0} step={50} value={rules.buyer.max} disabled={busy} onChange={(e) => setB({ max: Math.max(0, Number(e.target.value) || 0) })} aria-label="Hard limit per payment, even with approval, in dollars" /></span>
+                <span className="lb-hint">never more than this</span>
               </RuleRow>
               <RuleRow label="May buy" st={v.buyer.scope}>
                 {CATS.map(([k, l]) => <Toggle key={k} on={rules.buyer.categories.includes(k)} disabled={busy} onClick={() => setB({ categories: flip(rules.buyer.categories, k) })}>{l}</Toggle>)}
@@ -255,7 +259,7 @@ export function Lab() {
             <div className="lb-prompts">
               {cat.prompts.map((p: any) => {
                 const I = PROMPT_ICON[p.kind];
-                const on = p.id === prompt;
+                const on = p.id === ran;
                 return <button key={p.id} className="lb-prompt" aria-pressed={on} disabled={busy} onClick={() => pickPrompt(p.id)}><I aria-hidden="true" /><span>{p.prompt}</span>{busy && on ? <LoaderCircle className="spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</button>;
               })}
             </div>
